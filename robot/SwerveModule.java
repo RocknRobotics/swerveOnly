@@ -23,6 +23,7 @@ public class SwerveModule {
     public SwerveModule(int driveMotorID, int turnMotorID, int turnEncoderID, boolean driveMotorInvert, boolean turnMotorInvert, double offsetAngle) {
         driveMotor = new CANSparkMax(driveMotorID, MotorType.kBrushless);
         turnMotor = new CANSparkMax(turnMotorID, MotorType.kBrushless);
+        driveRelative = driveMotor.getEncoder();
         turnEncoder = new AnalogEncoder(turnEncoderID);
 
         turnEncoder.setPositionOffset(offsetAngle);
