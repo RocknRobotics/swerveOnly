@@ -31,13 +31,13 @@ public class SwerveMaster {
 
     public SwerveMaster() {
         leftUpModule = new SwerveModule(driveConstants.leftUpID, turnConstants.leftUpID, turnConstants.leftUpEncoderID, 
-        driveConstants.leftUpInvert, turnConstants.leftUpInvert, turnConstants.leftUpOffset);
+        turnConstants.leftUpInvert, turnConstants.leftUpEncoderInvert, turnConstants.leftUpOffset);
         leftDownModule = new SwerveModule(driveConstants.leftDownID, turnConstants.leftDownID, turnConstants.leftDownEncoderID, 
-        driveConstants.leftDownInvert, turnConstants.leftDownInvert, turnConstants.leftDownOffset);
+        turnConstants.leftDownInvert, turnConstants.leftDownEncoderInvert, turnConstants.leftDownOffset);
         rightUpModule = new SwerveModule(driveConstants.rightUpID, turnConstants.rightUpID, turnConstants.rightUpEncoderID, 
-        driveConstants.rightUpInvert, turnConstants.rightUpInvert, turnConstants.rightUpOffset);
+        turnConstants.rightUpInvert, turnConstants.rightUpEncoderInvert, turnConstants.rightUpOffset);
         rightDownModule = new SwerveModule(driveConstants.rightDownID, turnConstants.rightDownID, turnConstants.rightDownEncoderID, 
-        driveConstants.rightDownInvert, turnConstants.rightDownInvert, turnConstants.rightDownOffset);
+        turnConstants.rightDownInvert, turnConstants.rightDownEncoderInvert, turnConstants.rightDownOffset);
 
         accelerometer = new AHRS(Port.kMXP, Constants.accelerometerUpdateFrequency);
         accelerometer.reset();
@@ -79,6 +79,12 @@ public class SwerveMaster {
 
     //Does the heavy lifting
     public void teleopUpdate(double[] inputs, double[] velocities, double[] positions, double reducedAngle) {
+        for(int i = 0; i < inputs.length; i++) {
+            if(Math.abs(inputs[i]) < Constants.driveControllerStopBelowThis) {
+                inputs[i] = 0d;
+            }
+        }
+        
         //Arrays to be published later
         double driveSets[] = new double[]{0d, 0d, 0d, 0d};
         double turnSets[] = new double[]{0d, 0d, 0d, 0d};
@@ -122,7 +128,6 @@ public class SwerveMaster {
             new SwerveModulePosition(velocities[2], Rotation2d.fromRadians(positions[2])), 
             new SwerveModulePosition(velocities[3], Rotation2d.fromRadians(positions[3]))});
 
-        //Update NetworkTable with new values
         this.set(driveSets, turnSets);
     }
 

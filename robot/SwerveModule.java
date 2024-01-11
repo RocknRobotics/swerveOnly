@@ -20,16 +20,18 @@ public class SwerveModule {
     //The encoder for the turn motor
     private AnalogEncoder turnEncoder;
 
-    public SwerveModule(int driveMotorID, int turnMotorID, int turnEncoderID, boolean driveMotorInvert, boolean turnMotorInvert, double offsetAngle) {
+    private int encoderInvert;
+
+    public SwerveModule(int driveMotorID, int turnMotorID, int turnEncoderID, boolean turnMotorInvert, boolean encoderInvert, double offsetAngle) {
         driveMotor = new CANSparkMax(driveMotorID, MotorType.kBrushless);
         turnMotor = new CANSparkMax(turnMotorID, MotorType.kBrushless);
         driveRelative = driveMotor.getEncoder();
         turnEncoder = new AnalogEncoder(turnEncoderID);
 
         turnEncoder.setPositionOffset(offsetAngle);
-
-        driveMotor.setInverted(driveMotorInvert);
         turnMotor.setInverted(turnMotorInvert);
+
+        this.encoderInvert = encoderInvert ? -1 : 1;
     }
 
     //Returns a SwerveModuleState representation of this SwerveModule
@@ -49,7 +51,7 @@ public class SwerveModule {
 
     //Radians position of the turn talon
     public double getAbsoluteTurnPosition() {
-        return turnEncoder.getAbsolutePosition() * turnConstants.radsPerRotation;
+        return encoderInvert * turnEncoder.getAbsolutePosition() * turnConstants.radsPerRotation;
     }
 
     //Metres/second velocity of the drive talon
