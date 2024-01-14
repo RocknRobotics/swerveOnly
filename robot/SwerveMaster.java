@@ -16,12 +16,12 @@ import edu.wpi.first.wpilibj.I2C.Port;
 import edu.wpi.first.wpilibj.PS4Controller;
 
 public class SwerveMaster {
-    private SwerveModule leftUpModule;
-    private SwerveModule leftDownModule;
-    private SwerveModule rightUpModule;
-    private SwerveModule rightDownModule;
+    public SwerveModule leftUpModule;
+    public SwerveModule leftDownModule;
+    public SwerveModule rightUpModule;
+    public SwerveModule rightDownModule;
 
-    private AHRS accelerometer;
+    public AHRS accelerometer;
 
     private SwerveDriveOdometry odometer;
 
@@ -30,13 +30,13 @@ public class SwerveMaster {
     private PIDController turnPIDController;
 
     public SwerveMaster() {
-        leftUpModule = new SwerveModule(driveConstants.leftUpID, turnConstants.leftUpID, turnConstants.leftUpEncoderID, 
+        leftUpModule = new SwerveModule(driveConstants.leftUpID, turnConstants.leftUpID, turnConstants.leftUpEncoderID, driveConstants.leftUpInvert, 
         turnConstants.leftUpInvert, turnConstants.leftUpEncoderInvert, turnConstants.leftUpOffset);
-        leftDownModule = new SwerveModule(driveConstants.leftDownID, turnConstants.leftDownID, turnConstants.leftDownEncoderID, 
+        leftDownModule = new SwerveModule(driveConstants.leftDownID, turnConstants.leftDownID, turnConstants.leftDownEncoderID, driveConstants.leftDownInvert, 
         turnConstants.leftDownInvert, turnConstants.leftDownEncoderInvert, turnConstants.leftDownOffset);
-        rightUpModule = new SwerveModule(driveConstants.rightUpID, turnConstants.rightUpID, turnConstants.rightUpEncoderID, 
+        rightUpModule = new SwerveModule(driveConstants.rightUpID, turnConstants.rightUpID, turnConstants.rightUpEncoderID, driveConstants.rightUpInvert, 
         turnConstants.rightUpInvert, turnConstants.rightUpEncoderInvert, turnConstants.rightUpOffset);
-        rightDownModule = new SwerveModule(driveConstants.rightDownID, turnConstants.rightDownID, turnConstants.rightDownEncoderID, 
+        rightDownModule = new SwerveModule(driveConstants.rightDownID, turnConstants.rightDownID, turnConstants.rightDownEncoderID, driveConstants.rightDownInvert, 
         turnConstants.rightDownInvert, turnConstants.rightDownEncoderInvert, turnConstants.rightDownOffset);
 
         accelerometer = new AHRS(Port.kMXP, Constants.accelerometerUpdateFrequency);
@@ -44,10 +44,12 @@ public class SwerveMaster {
 
         turnPIDController = new PIDController(Constants.motorConstants.turnConstants.kP, 0d, 0d);
         turnPIDController.enableContinuousInput(-Math.PI, Math.PI);
+
+        odometer = new SwerveDriveOdometry(driveConstants.drivemotorKinematics, getRotation2d(), new SwerveModulePosition[]{new SwerveModulePosition(0.0, Rotation2d.fromRadians(leftUpModule.getAbsoluteTurnPosition())), new SwerveModulePosition(0.0, Rotation2d.fromRadians(leftDownModule.getAbsoluteTurnPosition())), new SwerveModulePosition(0.0, Rotation2d.fromRadians(rightUpModule.getAbsoluteTurnPosition())), new SwerveModulePosition(0.0, Rotation2d.fromRadians(rightDownModule.getAbsoluteTurnPosition()))});
     }
 
     public void update(PS4Controller controller, double factor) {
-        teleopUpdate(new double[]{controller.getLeftX() * factor, controller.getLeftY() * factor, controller.getRightX() * factor}, 
+        teleopUpdate(new double[]{Math.abs(controller.getLeftX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftX() * factor, Math.abs(controller.getLeftY()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftY() * factor, Math.abs(controller.getRightX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getRightX() * factor}, 
         new double[]{leftUpModule.getDriveVelocity(), leftDownModule.getDriveVelocity(), rightUpModule.getDriveVelocity(), rightDownModule.getDriveVelocity()}, 
         new double[]{leftUpModule.getAbsoluteTurnPosition(), leftDownModule.getAbsoluteTurnPosition(), rightUpModule.getAbsoluteTurnPosition(), rightDownModule.getAbsoluteTurnPosition()}, 
         this.getReducedAngle());
@@ -83,6 +85,8 @@ public class SwerveMaster {
             if(Math.abs(inputs[i]) < Constants.driveControllerStopBelowThis) {
                 inputs[i] = 0d;
             }
+
+            System.out.println(inputs[i]);
         }
         
         //Arrays to be published later
@@ -111,6 +115,8 @@ public class SwerveMaster {
 
         //Optimize the states
         for(int i = 0; i < targetStates.length; i++) {
+            //targetStates[i].speedMetersPerSecond *= 10;
+            System.out.println("I: "+ i + "\tSpeed: " + targetStates[i].speedMetersPerSecond);
             if(Math.abs(targetStates[i].speedMetersPerSecond) < Constants.motorConstants.driveConstants.stopBelowThisVelocity) {
                 driveSets[i] = 0d;
                 turnSets[i] = 0d;
@@ -119,6 +125,11 @@ public class SwerveMaster {
                 driveSets[i] = targetStates[i].speedMetersPerSecond / (Constants.motorConstants.driveConstants.maxSpeed * Constants.motorConstants.driveConstants.metresPerRotation);
                 turnSets[i] = turnPIDController.calculate(positions[i], targetStates[i].angle.getRadians());
             }
+
+            driveSets[i] *= 10.0;
+            turnSets[i] /= 50.0;
+            System.out.println("Drive: " + driveSets[i]);
+            System.out.println("Turn: " + turnSets[i]);
         }
 
         //Update odometry
