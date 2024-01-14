@@ -12,24 +12,26 @@ import frc.robot.Constants.motorConstants.*;
 //The class is used to represent a drive talon and turn talon that are part of one the swerve modules
 public class SwerveModule {
     //The Neo motors
-    private CANSparkMax driveMotor;
-    private CANSparkMax turnMotor;
+    public CANSparkMax driveMotor;
+    public CANSparkMax turnMotor;
 
     private RelativeEncoder driveRelative;
 
     //The encoder for the turn motor
     private AnalogEncoder turnEncoder;
+    private double encoderOffset;
 
     private int encoderInvert;
 
-    public SwerveModule(int driveMotorID, int turnMotorID, int turnEncoderID, boolean turnMotorInvert, boolean encoderInvert, double offsetAngle) {
+    public SwerveModule(int driveMotorID, int turnMotorID, int turnEncoderID, boolean driveMotorInvert, boolean turnMotorInvert, boolean encoderInvert, double offsetAngle) {
         driveMotor = new CANSparkMax(driveMotorID, MotorType.kBrushless);
         turnMotor = new CANSparkMax(turnMotorID, MotorType.kBrushless);
         driveRelative = driveMotor.getEncoder();
         turnEncoder = new AnalogEncoder(turnEncoderID);
 
-        turnEncoder.setPositionOffset(offsetAngle);
+        driveMotor.setInverted(driveMotorInvert);
         turnMotor.setInverted(turnMotorInvert);
+        this.encoderOffset = offsetAngle;
 
         this.encoderInvert = encoderInvert ? -1 : 1;
     }
@@ -51,7 +53,7 @@ public class SwerveModule {
 
     //Radians position of the turn talon
     public double getAbsoluteTurnPosition() {
-        return encoderInvert * turnEncoder.getAbsolutePosition() * turnConstants.radsPerRotation;
+        return encoderInvert * turnEncoder.getAbsolutePosition() * turnConstants.radsPerRotation - encoderOffset;
     }
 
     //Metres/second velocity of the drive talon
