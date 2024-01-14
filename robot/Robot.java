@@ -1,13 +1,11 @@
 package frc.robot;
 
-import com.revrobotics.CANSparkMax;
-import com.revrobotics.RelativeEncoder;
-import com.revrobotics.CANSparkMaxLowLevel.MotorType;
+import com.revrobotics.CANSparkMax.IdleMode;
 
-import edu.wpi.first.wpilibj.AnalogEncoder;
 import edu.wpi.first.wpilibj.PS4Controller;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import frc.robot.Constants.motorConstants.turnConstants;
 
 public class Robot extends TimedRobot {
   //The PS4Controller for driving
@@ -18,12 +16,9 @@ public class Robot extends TimedRobot {
   private SwerveMaster mySwerveMaster;
   
   //Testing stuff
-  private CANSparkMax testMotor;
-  private RelativeEncoder testEncoder;
-  private CANSparkMax testTurnMotor;
-  private RelativeEncoder testTurnEncoder;
-  private double maxRPM;
-  private AnalogEncoder encoder;
+  double maxSpeed = 0.0;
+  double time = 0.0;
+  double prevAngle = 0.0;
   
   @Override
   public void robotInit() {
@@ -31,13 +26,13 @@ public class Robot extends TimedRobot {
 
     driveController = new PS4Controller(Constants.driveControllerPort);
     driveControllerFactor = 1d;
-    //mySwerveMaster = new SwerveMaster();
-    testMotor = new CANSparkMax(2, MotorType.kBrushless);
-    testTurnMotor = new CANSparkMax(6, MotorType.kBrushless);
-    testEncoder = testMotor.getEncoder();
-    testTurnEncoder = testTurnMotor.getEncoder();
-    maxRPM = 0d;
-    encoder = new AnalogEncoder(3);
+    mySwerveMaster = new SwerveMaster();
+
+    mySwerveMaster.leftUpModule.driveMotor.setIdleMode(IdleMode.kBrake);
+    mySwerveMaster.leftDownModule.driveMotor.setIdleMode(IdleMode.kBrake);
+    mySwerveMaster.rightUpModule.driveMotor.setIdleMode(IdleMode.kBrake);
+    mySwerveMaster.rightDownModule.driveMotor.setIdleMode(IdleMode.kBrake);
+    mySwerveMaster.resetAccelerometer();
   }
 
   //Every 20ms
@@ -52,6 +47,13 @@ public class Robot extends TimedRobot {
 
   @Override
   public void teleopInit() {
+    SmartDashboard.putString("Current mode: ", "teleopInit");
+  }
+
+  @Override
+  public void teleopPeriodic() {
+    SmartDashboard.putString("Current mode: ", "teleopPeriodic");
+
     if(driveController.getTouchpadPressed()) {
       driveControllerFactor = 0d;
     } else if(driveController.getSquareButtonPressed()) {
@@ -64,17 +66,21 @@ public class Robot extends TimedRobot {
       driveControllerFactor = 1d;
     }
 
-    //mySwerveMaster.update(driveController, driveControllerFactor);
+    SmartDashboard.putNumber("Drive Factor: ", driveControllerFactor);
+    SmartDashboard.putNumber("Drive Controller Left Y: ", driveController.getLeftY());
+    SmartDashboard.putNumber("Drive Controller Right X: ", driveController.getRightX());
+    SmartDashboard.putNumber("Left Up Encoder: ", mySwerveMaster.leftUpModule.getAbsoluteTurnPosition());
+    SmartDashboard.putNumber("Left Down Encoder: ", mySwerveMaster.leftDownModule.getAbsoluteTurnPosition());
+    SmartDashboard.putNumber("Right Up Encoder: ", mySwerveMaster.rightUpModule.getAbsoluteTurnPosition());
+    SmartDashboard.putNumber("Right Down Encoder: ", mySwerveMaster.rightDownModule.getAbsoluteTurnPosition());
+
+    mySwerveMaster.update(driveController, driveControllerFactor);
   }
 
   @Override
-  public void teleopPeriodic() {}
-
-  @Override
   public void disabledInit() {
-    //mySwerveMaster.set(new double[]{0d, 0d, 0d, 0d}, new double[]{0d, 0d, 0d, 0d});
-    testMotor.set(0);
-    testTurnMotor.set(0);
+    SmartDashboard.putString("Current mode: ", "disabledInit");
+    mySwerveMaster.set(new double[]{0d, 0d, 0d, 0d}, new double[]{0d, 0d, 0d, 0d});
   }
 
   @Override
@@ -101,20 +107,67 @@ public class Robot extends TimedRobot {
       driveControllerFactor = 1d;
     }
 
+    double currSpeed = 0.0;
+
+    if(time == 0.0) {
+      prevAngle = mySwerveMaster.accelerometer.getYaw();
+      time = System.nanoTime();
+    } else {
+      double tempAngle = mySwerveMaster.accelerometer.getYaw();
+      currSpeed = Math.abs(mySwerveMaster.accelerometer.getYaw() - prevAngle) / ((System.nanoTime() - time) * Math.pow(10, -9));
+      if(tempAngle > 300 && prevAngle < 100) {
+        currSpeed = 0.0;
+      }
+      if(tempAngle < 100 && prevAngle > 300) {
+        currSpeed = 0.0;
+      }
+      if(currSpeed > 10000) {
+        currSpeed = 0.0;
+      }
+      prevAngle = mySwerveMaster.accelerometer.getYaw();
+      time = System.nanoTime();
+    }
+
+    if(currSpeed > maxSpeed) {
+      maxSpeed = currSpeed;
+    }
+
     SmartDashboard.putNumber("Drive Factor: ", driveControllerFactor);
     SmartDashboard.putNumber("Drive Controller Left Y: ", driveController.getLeftY());
     SmartDashboard.putNumber("Drive Controller Right X: ", driveController.getRightX());
+    SmartDashboard.putNumber("Max Speed: ", maxSpeed);
+    SmartDashboard.putNumber("Left Up Encoder: ", mySwerveMaster.leftUpModule.getAbsoluteTurnPosition());
+    SmartDashboard.putNumber("Left Down Encoder: ", mySwerveMaster.leftDownModule.getAbsoluteTurnPosition());
+    SmartDashboard.putNumber("Right Up Encoder: ", mySwerveMaster.rightUpModule.getAbsoluteTurnPosition());
+    SmartDashboard.putNumber("Right Down Encoder: ", mySwerveMaster.rightDownModule.getAbsoluteTurnPosition());
 
-    testMotor.set(driveControllerFactor * (Math.abs(driveController.getLeftY()) < Constants.driveControllerStopBelowThis ? 0d : driveController.getLeftY()));
-    testTurnMotor.set(driveControllerFactor * (Math.abs(driveController.getRightX()) < Constants.driveControllerStopBelowThis ? 0d : driveController.getRightX()));
 
-    if(Math.abs(testEncoder.getVelocity()) > maxRPM) {
-      maxRPM = Math.abs(testEncoder.getVelocity());
-      SmartDashboard.putNumber("Max RPM: ", maxRPM);
-    }
+    double leftY = Math.abs(driveController.getLeftY()) < Constants.driveControllerStopBelowThis ? 0.0 : driveController.getLeftY() * driveControllerFactor;
+    //double rightX = Math.abs(driveController.getRightX()) < Constants.driveControllerStopBelowThis ? 0.0 : driveController.getRightX() * driveControllerFactor;
 
-    SmartDashboard.putNumber("Drive RPM: ", testEncoder.getVelocity());
-    SmartDashboard.putNumber("Turn RPM: ", testTurnEncoder.getVelocity());
-    SmartDashboard.putNumber("Encoder value: ", encoder.getAbsolutePosition());
+    double[] turnSets = new double[]{0.05 * (7 * Math.PI / 4 - mySwerveMaster.leftUpModule.getAbsoluteTurnPosition()), 
+      0.025 * (Math.PI / 4 - (mySwerveMaster.leftDownModule.getAbsoluteTurnPosition() < 0 ? mySwerveMaster.leftDownModule.getAbsoluteTurnPosition() + Math.PI : mySwerveMaster.leftDownModule.getAbsoluteTurnPosition())), 
+      0.05 * (5 * Math.PI / 4 - mySwerveMaster.rightUpModule.getAbsoluteTurnPosition()), 
+      0.05 * (3 * Math.PI / 4 - mySwerveMaster.rightDownModule.getAbsoluteTurnPosition())};
+
+      if(mySwerveMaster.leftUpModule.getAbsoluteTurnPosition() < Math.PI) {
+        turnSets[0] *= -1;
+      }
+      if(mySwerveMaster.leftDownModule.getAbsoluteTurnPosition() < Math.PI) {
+        turnSets[1] *= -1;
+      }
+      if(mySwerveMaster.rightUpModule.getAbsoluteTurnPosition() < Math.PI) {
+        turnSets[2] *= -1;
+      }
+      if(mySwerveMaster.rightDownModule.getAbsoluteTurnPosition() < Math.PI) {
+        turnSets[3] *= -1;
+      }
+
+      turnSets[0] = 0.0;
+      turnSets[1] = 0.0;
+      turnSets[2] = 0.0;
+      turnSets[3] = 0.0;
+
+    mySwerveMaster.set(new double[]{leftY, leftY, leftY, leftY}, turnSets);
   }
 }
