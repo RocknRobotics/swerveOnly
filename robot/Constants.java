@@ -11,15 +11,15 @@ public final class Constants {
     public static final byte accelerometerUpdateFrequency = 50;
 
     //The physical max speed the robot can move in metres/second
-    public static final double maxTranslationalSpeed = 1d; //TODO
+    public static final double maxTranslationalSpeed = 3.420296449459403d; //TODO
     //The physical max speed the robot can rotate in radians/second
-    public static final double maxAngularSpeed = 1d; //TODO
+    public static final double maxAngularSpeed = Math.PI * 2; //TODO
 
     //The port the drive controller is connected to
     public static final int driveControllerPort = 0;
 
     //The value of the driveController below which we will treat it as a zero instead
-    public static final double driveControllerStopBelowThis = 0.1;
+    public static final double driveControllerStopBelowThis = 0.15;
 
     public static final class motorConstants {
         public static final class turnConstants {
@@ -41,7 +41,7 @@ public final class Constants {
             public static final boolean leftUpInvert = false;
             public static final boolean leftDownInvert = false;
             public static final boolean rightUpInvert = false;
-            public static final boolean rightDownInvert = false; //Done
+            public static final boolean rightDownInvert = false;
 
             public static final int leftUpEncoderID = 0;
             public static final int leftDownEncoderID = 1;
@@ -50,16 +50,16 @@ public final class Constants {
 
             //TODO
             //Encoder offsets---the values of the encoders when the module is in the "0" position (facing forward or whatever)
-            public static final double leftUpOffset = 0.0;
-            public static final double leftDownOffset = 0.0;
-            public static final double rightUpOffset = 0.0;
-            public static final double rightDownOffset = 0.0;
+            public static final double leftUpOffset = 0.037448048774097;//3.332876340894647;
+            public static final double leftDownOffset = 2.066832339784717;//5.164710060094233;//1.981625914295975;
+            public static final double rightUpOffset = 0.045249725602034;//0.060853079257908;
+            public static final double rightDownOffset = 0.07177542681702;//0.070215091451432;
 
             //TODO
-            public static final boolean leftUpEncoderInvert = true;
-            public static final boolean leftDownEncoderInvert = true;
-            public static final boolean rightUpEncoderInvert = true;
-            public static final boolean rightDownEncoderInvert = true;
+            public static final boolean leftUpEncoderInvert = false;
+            public static final boolean leftDownEncoderInvert = false;
+            public static final boolean rightUpEncoderInvert = false;
+            public static final boolean rightDownEncoderInvert = false;
         }
 
         public static final class driveConstants {
@@ -68,7 +68,7 @@ public final class Constants {
             //The amount of metres traveled per rotation of the drive motor (Circumference of wheel * wheel rotation per motor rotation)
             public static final double metresPerRotation = gearRatio * driveWheelDiameter * Math.PI;
             //Units in metres/second, the velocity below which the swerve module motors will stop instead of going to a desired state
-            public static final double stopBelowThisVelocity = 0.001d; //Make it higher? Or is it good?
+            public static final double stopBelowThisVelocity = 0.01d; //Make it higher? Or is it good?
             //The physical max speed in rotations/second of the drive motors
             public static final double maxSpeed = 5700d; //5714.28369140625
 
@@ -78,9 +78,9 @@ public final class Constants {
             public static final int rightDownID = 4;
 
             //TODO
-            public static final boolean leftUpInvert = false;
-            public static final boolean leftDownInvert = false;
-            public static final boolean rightUpInvert = false;
+            public static final boolean leftUpInvert = true;//false;
+            public static final boolean leftDownInvert = false;//true;
+            public static final boolean rightUpInvert = true;
             public static final boolean rightDownInvert = true; //Done
 
             //The distance in metres between the left wheels and the right wheels
@@ -90,10 +90,14 @@ public final class Constants {
 
             //Order--- leftUp, leftDown, rightUp, rightDown
             public static final SwerveDriveKinematics drivemotorKinematics = new SwerveDriveKinematics(
-                new Translation2d(upToDownDistanceMetres / 2d, -leftToRightDistanceMetres / 2d), 
+                /*new Translation2d(upToDownDistanceMetres / 2d, -leftToRightDistanceMetres / 2d), 
                 new Translation2d(-upToDownDistanceMetres / 2d, -leftToRightDistanceMetres / 2d), 
                 new Translation2d(upToDownDistanceMetres / 2d, leftToRightDistanceMetres / 2d), 
-                new Translation2d(-upToDownDistanceMetres / 2d, leftToRightDistanceMetres / 2d));
+                new Translation2d(-upToDownDistanceMetres / 2d, leftToRightDistanceMetres / 2d)*/
+                new Translation2d(-upToDownDistanceMetres / 2d, leftToRightDistanceMetres / 2d), 
+                new Translation2d(upToDownDistanceMetres / 2d, leftToRightDistanceMetres / 2d), 
+                new Translation2d(-upToDownDistanceMetres / 2d, -leftToRightDistanceMetres / 2d), 
+                new Translation2d(upToDownDistanceMetres / 2d, -leftToRightDistanceMetres / 2d));
         }
     }
 }
