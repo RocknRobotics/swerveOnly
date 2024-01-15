@@ -16,10 +16,7 @@ import edu.wpi.first.wpilibj.I2C.Port;
 import edu.wpi.first.wpilibj.PS4Controller;
 
 public class SwerveMaster {
-    public SwerveModule leftUpModule;
-    public SwerveModule leftDownModule;
-    public SwerveModule rightUpModule;
-    public SwerveModule rightDownModule;
+    SwerveModule[] swerveModules;
 
     public AHRS accelerometer;
 
@@ -29,15 +26,21 @@ public class SwerveMaster {
     //this once we have the swerve drive built
     private PIDController turnPIDController;
 
+    private double[] turns;
+    private double[] drives;
+
+    boolean driveReady;
+
     public SwerveMaster() {
-        leftUpModule = new SwerveModule(driveConstants.leftUpID, turnConstants.leftUpID, turnConstants.leftUpEncoderID, driveConstants.leftUpInvert, 
-        turnConstants.leftUpInvert, turnConstants.leftUpEncoderInvert, turnConstants.leftUpOffset);
-        leftDownModule = new SwerveModule(driveConstants.leftDownID, turnConstants.leftDownID, turnConstants.leftDownEncoderID, driveConstants.leftDownInvert, 
-        turnConstants.leftDownInvert, turnConstants.leftDownEncoderInvert, turnConstants.leftDownOffset);
-        rightUpModule = new SwerveModule(driveConstants.rightUpID, turnConstants.rightUpID, turnConstants.rightUpEncoderID, driveConstants.rightUpInvert, 
-        turnConstants.rightUpInvert, turnConstants.rightUpEncoderInvert, turnConstants.rightUpOffset);
-        rightDownModule = new SwerveModule(driveConstants.rightDownID, turnConstants.rightDownID, turnConstants.rightDownEncoderID, driveConstants.rightDownInvert, 
-        turnConstants.rightDownInvert, turnConstants.rightDownEncoderInvert, turnConstants.rightDownOffset);
+        swerveModules = new SwerveModule[] {
+        new SwerveModule(driveConstants.leftUpID, turnConstants.leftUpID, turnConstants.leftUpEncoderID, driveConstants.leftUpInvert, 
+        turnConstants.leftUpInvert, turnConstants.leftUpEncoderInvert, turnConstants.leftUpOffset),
+        new SwerveModule(driveConstants.leftDownID, turnConstants.leftDownID, turnConstants.leftDownEncoderID, driveConstants.leftDownInvert, 
+        turnConstants.leftDownInvert, turnConstants.leftDownEncoderInvert, turnConstants.leftDownOffset),
+        new SwerveModule(driveConstants.rightUpID, turnConstants.rightUpID, turnConstants.rightUpEncoderID, driveConstants.rightUpInvert, 
+        turnConstants.rightUpInvert, turnConstants.rightUpEncoderInvert, turnConstants.rightUpOffset),
+        new SwerveModule(driveConstants.rightDownID, turnConstants.rightDownID, turnConstants.rightDownEncoderID, driveConstants.rightDownInvert, 
+        turnConstants.rightDownInvert, turnConstants.rightDownEncoderInvert, turnConstants.rightDownOffset)};
 
         accelerometer = new AHRS(Port.kMXP, Constants.accelerometerUpdateFrequency);
         accelerometer.reset();
@@ -46,20 +49,26 @@ public class SwerveMaster {
         turnPIDController.enableContinuousInput(-Math.PI, Math.PI);
 
         odometer = new SwerveDriveOdometry(driveConstants.drivemotorKinematics, getRotation2d(), new SwerveModulePosition[]{new SwerveModulePosition(0.0, Rotation2d.fromRadians(leftUpModule.getAbsoluteTurnPosition())), new SwerveModulePosition(0.0, Rotation2d.fromRadians(leftDownModule.getAbsoluteTurnPosition())), new SwerveModulePosition(0.0, Rotation2d.fromRadians(rightUpModule.getAbsoluteTurnPosition())), new SwerveModulePosition(0.0, Rotation2d.fromRadians(rightDownModule.getAbsoluteTurnPosition()))});
+            
+        turns = new double[4];
+        drives = new double[4];
+
+        driveReady = false;
     }
 
     public void update(PS4Controller controller, double factor) {
-        teleopUpdate(new double[]{Math.abs(controller.getLeftX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftX() * factor, Math.abs(controller.getLeftY()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftY() * factor, Math.abs(controller.getRightX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getRightX() * factor}, 
-        new double[]{leftUpModule.getDriveVelocity(), leftDownModule.getDriveVelocity(), rightUpModule.getDriveVelocity(), rightDownModule.getDriveVelocity()}, 
-        new double[]{leftUpModule.getAbsoluteTurnPosition(), leftDownModule.getAbsoluteTurnPosition(), rightUpModule.getAbsoluteTurnPosition(), rightDownModule.getAbsoluteTurnPosition()}, 
-        this.getReducedAngle());
-    }
+        double[] axisInputs = new double[]{Math.abs(controller.getLeftX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftX() * factor,
+            Math.abs(controller.getLeftY()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftY() * factor,
+            Math.abs(controller.getRightX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getRightX() * factor,
+            Math.abs(controller.getRightY()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getRightY() * factor};
 
-    public void set(double[] driveSets, double[] turnSets) {
-        leftUpModule.set(driveSets[0], turnSets[0]);
-        leftDownModule.set(driveSets[1], turnSets[1]);
-        rightUpModule.set(driveSets[2], turnSets[2]);
-        rightDownModule.set(driveSets[3], turnSets[3]);
+        double[] angles = new double[]{leftUpModule.getAbsoluteTurnPosition(),
+            leftDownModule.getAbsoluteTurnPosition(),
+            rightUpModule.getAbsoluteTurnPosition(),
+            rightDownModule.getAbsoluteTurnPosition()};
+
+        driveReady = drive(axisInputs, controller.getR2Axis() / 4);//adjsut drive speed. Also change to left 2d input after testing
+        set();
     }
 
     public void resetAccelerometer() {
@@ -79,69 +88,6 @@ public class SwerveMaster {
         return Rotation2d.fromDegrees(this.getReducedAngle());
     }
 
-    //Does the heavy lifting
-    public void teleopUpdate(double[] inputs, double[] velocities, double[] positions, double reducedAngle) {
-        for(int i = 0; i < inputs.length; i++) {
-            if(Math.abs(inputs[i]) < Constants.driveControllerStopBelowThis) {
-                inputs[i] = 0d;
-            }
-
-            System.out.println(inputs[i]);
-        }
-        
-        //Arrays to be published later
-        double driveSets[] = new double[]{0d, 0d, 0d, 0d};
-        double turnSets[] = new double[]{0d, 0d, 0d, 0d};
-        //Converts PS4 joystick inputs (field relative) into robot-relative speeds
-        //First is x m/s where fwd is positive
-        //Second is y m/s where left is positive
-        //Third is rad/s where counter clockwise is positive
-        //Fourth is robot angle
-        //Input[0] == left/right, input[1] == up/down, input[2] == left/right (turn)
-        //So first == input[1], second == -input[0], and third == -input[2]?
-        ChassisSpeeds speeds = ChassisSpeeds.fromFieldRelativeSpeeds(inputs[1] * Constants.maxTranslationalSpeed, 
-        -inputs[0] * Constants.maxTranslationalSpeed, -inputs[2] * Constants.maxAngularSpeed, Rotation2d.fromDegrees(reducedAngle));
-        //Converts those speeds to targetStates since I'm not a monster who puts everything on one line (I had to resist the urge to)
-        SwerveModuleState[] targetStates = Constants.motorConstants.driveConstants.drivemotorKinematics.toSwerveModuleStates(speeds);
-
-        //Scales the targetStates in case it's not physically possible (for example it's impossible to go the true full move velocity 
-        //and true full rotational velocity at the same time)
-        SwerveDriveKinematics.desaturateWheelSpeeds(targetStates, Constants.motorConstants.driveConstants.drivemotorKinematics.toChassisSpeeds(
-            new SwerveModuleState[]{new SwerveModuleState(velocities[0], Rotation2d.fromRadians(positions[0])), 
-            new SwerveModuleState(velocities[1], Rotation2d.fromRadians(positions[1])), 
-            new SwerveModuleState(velocities[2], Rotation2d.fromRadians(positions[2])), 
-            new SwerveModuleState(velocities[3], Rotation2d.fromRadians(positions[3]))}), 
-        Constants.motorConstants.driveConstants.maxSpeed, Constants.maxTranslationalSpeed, Constants.maxAngularSpeed);
-
-        //Optimize the states
-        for(int i = 0; i < targetStates.length; i++) {
-            //targetStates[i].speedMetersPerSecond *= 10;
-            System.out.println("I: "+ i + "\tSpeed: " + targetStates[i].speedMetersPerSecond);
-            if(Math.abs(targetStates[i].speedMetersPerSecond) < Constants.motorConstants.driveConstants.stopBelowThisVelocity) {
-                driveSets[i] = 0d;
-                turnSets[i] = 0d;
-            } else {
-                SwerveModuleState.optimize(targetStates[i], Rotation2d.fromRadians(positions[i]));
-                driveSets[i] = targetStates[i].speedMetersPerSecond / (Constants.motorConstants.driveConstants.maxSpeed * Constants.motorConstants.driveConstants.metresPerRotation);
-                turnSets[i] = turnPIDController.calculate(positions[i], targetStates[i].angle.getRadians());
-            }
-
-            driveSets[i] *= 10.0;
-            turnSets[i] /= 50.0;
-            System.out.println("Drive: " + driveSets[i]);
-            System.out.println("Turn: " + turnSets[i]);
-        }
-
-        //Update odometry
-        odometer.update(Rotation2d.fromDegrees(reducedAngle), new SwerveModulePosition[]{
-            new SwerveModulePosition(velocities[0], Rotation2d.fromRadians(positions[0])), 
-            new SwerveModulePosition(velocities[1], Rotation2d.fromRadians(positions[1])), 
-            new SwerveModulePosition(velocities[2], Rotation2d.fromRadians(positions[2])), 
-            new SwerveModulePosition(velocities[3], Rotation2d.fromRadians(positions[3]))});
-
-        this.set(driveSets, turnSets);
-    }
-
     public Pose2d getPose() {
         return odometer.getPoseMeters();
     }
@@ -152,5 +98,87 @@ public class SwerveMaster {
             new SwerveModulePosition(velocities[1], Rotation2d.fromRadians(positions[1])), 
             new SwerveModulePosition(velocities[2], Rotation2d.fromRadians(positions[2])), 
             new SwerveModulePosition(velocities[3], Rotation2d.fromRadians(positions[3]))}, currPose);
+    }
+
+    public void set() {
+        leftUpModule.set(drives[0], turns[0]);
+        leftDownModule.set(drives[1], turns[1]);
+        rightUpModule.set(drives[2], turns[2]);
+        rightDownModule.set(drives[3], turns[3]);
+    }
+
+    //If this works, we need to somehow integrate turning 
+    public boolean drive(double[] axisInput, double drivePower) {
+        //get radian of left input axis
+        double targetRadian = Math.atan(axisInput[1] / axisInput[0]);
+
+        //adjust for quadrants II, III, and IV
+        if (axisInput[0] < 0) {
+            targetRadian += Math.PI;
+        } else if (axisInput[1] < 0) {
+            targetRadian += Math.PI;
+        }
+        
+        //run through each module and give them the correct turn speed
+        //CCW positive
+        //CW negative
+        for (int i = 0; i < 4; i++) {
+            double currRad = swerveModules[i].getAbsoluteTurnPosition();
+            
+            //calculate position of current rad relative to target rad
+            double radDifference = targetRadian - currRad;
+
+            //account for targetRad and currRad being on opposite sides of wrap
+            if (Math.abs(radDifference) > Math.abs(targetRadian - (currRad + Math.PI * 2))) {
+                radDifference = targetRadian - (currRad + Math.PI * 2);
+            } else if (Math.abs(radDifference) > Math.abs((targetRadian + Math.PI * 2) - currRad)) {
+                radDifference = (targetRadian + Math.PI * 2) - currRad;
+            } 
+
+            //allows better efficiency by turning smaller angle then inverting drive
+            if (Math.abs(radDifference) > Math.PI / 2) {
+                if (targetRadian >= Math.PI) {
+                    targetRadian -= Math.PI;
+                } else {
+                    targetRadian += Math.PI;
+                }
+
+                if (radDifference > 0) {
+                    radDifference -= Math.PI;
+                } else {
+                    radDifference += Math.PI;
+                }
+                swerveModules[i].invertDrive();
+            }
+
+            //actually turn to the target angle using percentage speed depending on radDifference
+            //check how many are not ready for drive
+            int notReady = 0;
+            //adjust tolerance             V
+            if (Math.abs(radDifference) > 0.05) {
+                turns[i] = 0.5 * (radDifference / (Math.PI / 4)); //Max turn speed of 0.5 
+
+                //Min turn speed of 0.1
+                if (radDifference < 0 && Math.abs(turns[i]) < 0.1) {
+                    turns[i] = -0.1;
+                } else if (radDifference > 0 && Math.abs(turns[i]) < 0.1) {
+                    turns[i] = 0.1;
+                } 
+                notReady++;
+                drives[i] = drives[i] * 0.95; //decelerate if not on right angle
+                if (Math.abs(drives[i]) < 0.05) {  
+                    drives[i] = 0;
+                }
+            } else {
+                turns[i] = 0; 
+                if (driveReady) { //accelerate if on right angle and ready to drive
+                    drives[i] += drivePower * (1 - (drives[i] / drivePower)) / 4;
+                } else {
+                    drives[i] = drives[i] * 0.95; //decelerate if not ready to drive
+                }
+            }
+
+            return (notReady == 0) || (driveReady && notReady != 4);
+        }
     }
 }

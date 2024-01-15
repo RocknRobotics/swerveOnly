@@ -60,4 +60,8 @@ public class SwerveModule {
     public double getDriveVelocity() {
         return driveRelative.getVelocity() * driveConstants.metresPerRotation;
     }
+
+    public void invertDrive() {
+        driveMotor.setInverted(!driveMotor.getInverted());
+    }
 }
