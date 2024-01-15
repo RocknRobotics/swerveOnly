@@ -42,8 +42,8 @@ public class SwerveModule {
     }
 
     public void set(double driveSet, double turnSet) {
-        driveMotor.set(driveSet);
-        turnMotor.set(turnSet);
+        driveMotor.set(driveSet - 0.25 * (driveSet - driveMotor.get()));
+        turnMotor.set(turnSet - 0.25 * (turnSet - turnMotor.get()));
     }
 
     //Metres position of the drive talon
