@@ -23,8 +23,6 @@ public final class Constants {
 
     public static final class motorConstants {
         public static final class turnConstants {
-            //PID controller position constant
-            public static final double kP = 0.5; //Change this?
             //Gear ratio between the turn motors and the module?
             //New info: between encoder and output, is maybe one since encoder is on output shaft?
             public static final double gearRatio = 1d / 1d;
@@ -94,10 +92,10 @@ public final class Constants {
                 new Translation2d(-upToDownDistanceMetres / 2d, -leftToRightDistanceMetres / 2d), 
                 new Translation2d(upToDownDistanceMetres / 2d, leftToRightDistanceMetres / 2d), 
                 new Translation2d(-upToDownDistanceMetres / 2d, leftToRightDistanceMetres / 2d)*/
-                new Translation2d(-upToDownDistanceMetres / 2d, leftToRightDistanceMetres / 2d), 
                 new Translation2d(upToDownDistanceMetres / 2d, leftToRightDistanceMetres / 2d), 
-                new Translation2d(-upToDownDistanceMetres / 2d, -leftToRightDistanceMetres / 2d), 
-                new Translation2d(upToDownDistanceMetres / 2d, -leftToRightDistanceMetres / 2d));
+                new Translation2d(-upToDownDistanceMetres / 2d, leftToRightDistanceMetres / 2d), 
+                new Translation2d(upToDownDistanceMetres / 2d, -leftToRightDistanceMetres / 2d), 
+                new Translation2d(-upToDownDistanceMetres / 2d, -leftToRightDistanceMetres / 2d));
         }
     }
 }
