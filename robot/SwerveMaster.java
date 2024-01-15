@@ -4,7 +4,6 @@ import frc.robot.Constants.motorConstants.*;
 
 import com.kauailabs.navx.frc.AHRS;
 
-import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
@@ -25,10 +24,6 @@ public class SwerveMaster {
 
     private SwerveDriveOdometry odometer;
 
-    //Enables continious input I think? I'm writing this using another person's code as a guide---I'll mess around with changing
-    //this once we have the swerve drive built
-    private PIDController turnPIDController;
-
     public SwerveMaster() {
         leftUpModule = new SwerveModule(driveConstants.leftUpID, turnConstants.leftUpID, turnConstants.leftUpEncoderID, driveConstants.leftUpInvert, 
         turnConstants.leftUpInvert, turnConstants.leftUpEncoderInvert, turnConstants.leftUpOffset);
@@ -42,14 +37,16 @@ public class SwerveMaster {
         accelerometer = new AHRS(Port.kMXP, Constants.accelerometerUpdateFrequency);
         accelerometer.reset();
 
-        turnPIDController = new PIDController(Constants.motorConstants.turnConstants.kP, 0d, 0d);
-        turnPIDController.enableContinuousInput(-Math.PI, Math.PI);
-
-        odometer = new SwerveDriveOdometry(driveConstants.drivemotorKinematics, getRotation2d(), new SwerveModulePosition[]{new SwerveModulePosition(0.0, Rotation2d.fromRadians(leftUpModule.getAbsoluteTurnPosition())), new SwerveModulePosition(0.0, Rotation2d.fromRadians(leftDownModule.getAbsoluteTurnPosition())), new SwerveModulePosition(0.0, Rotation2d.fromRadians(rightUpModule.getAbsoluteTurnPosition())), new SwerveModulePosition(0.0, Rotation2d.fromRadians(rightDownModule.getAbsoluteTurnPosition()))});
+        odometer = new SwerveDriveOdometry(driveConstants.drivemotorKinematics, getRotation2d(), 
+            new SwerveModulePosition[]{new SwerveModulePosition(0.0, Rotation2d.fromRadians(leftUpModule.getAbsoluteTurnPosition())), 
+            new SwerveModulePosition(0.0, Rotation2d.fromRadians(leftDownModule.getAbsoluteTurnPosition())), 
+            new SwerveModulePosition(0.0, Rotation2d.fromRadians(rightUpModule.getAbsoluteTurnPosition())), 
+            new SwerveModulePosition(0.0, Rotation2d.fromRadians(rightDownModule.getAbsoluteTurnPosition()))}, 
+            new Pose2d(0.0, 0.0, new Rotation2d(0.0)));
     }
 
     public void update(PS4Controller controller, double factor) {
-        teleopUpdate(new double[]{Math.abs(controller.getLeftX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftX() * factor, Math.abs(controller.getLeftY()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftY() * factor, Math.abs(controller.getRightX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getRightX() * factor}, 
+        teleopUpdate(new double[]{controller.getLeftX() * factor, controller.getLeftY() * factor, controller.getRightX() * factor}, 
         new double[]{leftUpModule.getDriveVelocity(), leftDownModule.getDriveVelocity(), rightUpModule.getDriveVelocity(), rightDownModule.getDriveVelocity()}, 
         new double[]{leftUpModule.getAbsoluteTurnPosition(), leftDownModule.getAbsoluteTurnPosition(), rightUpModule.getAbsoluteTurnPosition(), rightDownModule.getAbsoluteTurnPosition()}, 
         this.getReducedAngle());
@@ -81,12 +78,11 @@ public class SwerveMaster {
 
     //Does the heavy lifting
     public void teleopUpdate(double[] inputs, double[] velocities, double[] positions, double reducedAngle) {
+        //Sets controller inputs to 0 if they're below a certain value to prevent movement when it should be stopped
         for(int i = 0; i < inputs.length; i++) {
             if(Math.abs(inputs[i]) < Constants.driveControllerStopBelowThis) {
                 inputs[i] = 0d;
             }
-
-            System.out.println(inputs[i]);
         }
         
         //Arrays to be published later
@@ -111,25 +107,34 @@ public class SwerveMaster {
             new SwerveModuleState(velocities[1], Rotation2d.fromRadians(positions[1])), 
             new SwerveModuleState(velocities[2], Rotation2d.fromRadians(positions[2])), 
             new SwerveModuleState(velocities[3], Rotation2d.fromRadians(positions[3]))}), 
-        Constants.motorConstants.driveConstants.maxSpeed, Constants.maxTranslationalSpeed, Constants.maxAngularSpeed);
+        Constants.motorConstants.driveConstants.maxSpeed * Constants.motorConstants.driveConstants.metresPerRotation, Constants.maxTranslationalSpeed, Constants.maxAngularSpeed);
 
         //Optimize the states
         for(int i = 0; i < targetStates.length; i++) {
             //targetStates[i].speedMetersPerSecond *= 10;
-            System.out.println("I: "+ i + "\tSpeed: " + targetStates[i].speedMetersPerSecond);
             if(Math.abs(targetStates[i].speedMetersPerSecond) < Constants.motorConstants.driveConstants.stopBelowThisVelocity) {
                 driveSets[i] = 0d;
                 turnSets[i] = 0d;
             } else {
                 SwerveModuleState.optimize(targetStates[i], Rotation2d.fromRadians(positions[i]));
-                driveSets[i] = targetStates[i].speedMetersPerSecond / (Constants.motorConstants.driveConstants.maxSpeed * Constants.motorConstants.driveConstants.metresPerRotation);
-                turnSets[i] = turnPIDController.calculate(positions[i], targetStates[i].angle.getRadians());
-            }
 
-            driveSets[i] *= 10.0;
-            turnSets[i] /= 50.0;
-            System.out.println("Drive: " + driveSets[i]);
-            System.out.println("Turn: " + turnSets[i]);
+                //Essentially gets the proportion of the desired drive/turn speed in relation to the max possible speed, resulting in a value from -1.0 to 1.0 for driveSet/turnSet
+
+                //m/s / (r/s * m/r) = 1
+                //Divides m/s to set module to by max m/s of module to get proportion of what to set motor to (since it ranges from -1.0 to 1.0)
+                driveSets[i] = targetStates[i].speedMetersPerSecond / (Constants.motorConstants.driveConstants.maxSpeed * Constants.motorConstants.driveConstants.metresPerRotation);
+                //Max rotation is pi/2 (2pi / 4)
+                double radChange = targetStates[i].angle.getRadians() - positions[i];
+
+                if(positions[i] >= 3 * Math.PI / 2 && targetStates[i].angle.getRadians() <= Math.PI / 2) {
+                    radChange = targetStates[i].angle.getRadians() - (positions[i] - 2 * Math.PI);
+                }
+                if(positions[i] <= Math.PI / 2 && targetStates[i].angle.getRadians() >= 3 * Math.PI / 2) {
+                    radChange = (targetStates[i].angle.getRadians() - 2 * Math.PI) - positions[i];
+                }
+
+                turnSets[i] = radChange / (Math.PI / 2);
+            }
         }
 
         //Update odometry
