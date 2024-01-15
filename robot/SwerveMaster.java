@@ -67,7 +67,7 @@ public class SwerveMaster {
             rightUpModule.getAbsoluteTurnPosition(),
             rightDownModule.getAbsoluteTurnPosition()};
 
-        driveReady = drive(axisInputs, controller.getR2Axis() / 4);//adjsut drive speed. Also change to left 2d input after testing
+        driveReady = drive(axisInputs, (controller.getR2Axis() < Constants.driveControllerStopBelowThis ? 0.0 : controller.getR2Axis()) / 4);//adjust drive speed. Also change to left 2d input after testing
         set();
     }
 
