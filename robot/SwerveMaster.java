@@ -48,7 +48,7 @@ public class SwerveMaster {
         turnPIDController = new PIDController(Constants.motorConstants.turnConstants.kP, 0d, 0d);
         turnPIDController.enableContinuousInput(-Math.PI, Math.PI);
 
-        odometer = new SwerveDriveOdometry(driveConstants.drivemotorKinematics, getRotation2d(), new SwerveModulePosition[]{new SwerveModulePosition(0.0, Rotation2d.fromRadians(leftUpModule.getAbsoluteTurnPosition())), new SwerveModulePosition(0.0, Rotation2d.fromRadians(leftDownModule.getAbsoluteTurnPosition())), new SwerveModulePosition(0.0, Rotation2d.fromRadians(rightUpModule.getAbsoluteTurnPosition())), new SwerveModulePosition(0.0, Rotation2d.fromRadians(rightDownModule.getAbsoluteTurnPosition()))});
+        odometer = new SwerveDriveOdometry(driveConstants.drivemotorKinematics, getRotation2d(), new SwerveModulePosition[]{new SwerveModulePosition(0.0, Rotation2d.fromRadians(swerveModules[0].getAbsoluteTurnPosition())), new SwerveModulePosition(0.0, Rotation2d.fromRadians(swerveModules[1].getAbsoluteTurnPosition())), new SwerveModulePosition(0.0, Rotation2d.fromRadians(swerveModules[2].getAbsoluteTurnPosition())), new SwerveModulePosition(0.0, Rotation2d.fromRadians(swerveModules[3].getAbsoluteTurnPosition()))});
             
         turns = new double[4];
         drives = new double[4];
@@ -62,12 +62,24 @@ public class SwerveMaster {
             Math.abs(controller.getRightX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getRightX() * factor,
             Math.abs(controller.getRightY()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getRightY() * factor};
 
-        double[] angles = new double[]{leftUpModule.getAbsoluteTurnPosition(),
-            leftDownModule.getAbsoluteTurnPosition(),
-            rightUpModule.getAbsoluteTurnPosition(),
-            rightDownModule.getAbsoluteTurnPosition()};
+        double[] angles = new double[]{swerveModules[0].getAbsoluteTurnPosition(),
+            swerveModules[1].getAbsoluteTurnPosition(),
+            swerveModules[2].getAbsoluteTurnPosition(),
+            swerveModules[3].getAbsoluteTurnPosition()};
 
         driveReady = drive(axisInputs, (controller.getR2Axis() < Constants.driveControllerStopBelowThis ? 0.0 : controller.getR2Axis()) / 4);//adjust drive speed. Also change to left 2d input after testing
+        set();
+    }
+
+    public void disable() {
+        turns[0] = 0;
+        turns[1] = 0;
+        turns[2] = 0;
+        turns[3] = 0;
+        drives[0] = 0;
+        drives[1] = 0;
+        drives[2] = 0;
+        drives[3] = 0;
         set();
     }
 
@@ -101,10 +113,10 @@ public class SwerveMaster {
     }
 
     public void set() {
-        leftUpModule.set(drives[0], turns[0]);
-        leftDownModule.set(drives[1], turns[1]);
-        rightUpModule.set(drives[2], turns[2]);
-        rightDownModule.set(drives[3], turns[3]);
+        swerveModules[0].set(drives[0], turns[0]);
+        swerveModules[1].set(drives[1], turns[1]);
+        swerveModules[2].set(drives[2], turns[2]);
+        swerveModules[3].set(drives[3], turns[3]);
     }
 
     //If this works, we need to somehow integrate turning 
@@ -122,6 +134,8 @@ public class SwerveMaster {
         //run through each module and give them the correct turn speed
         //CCW positive
         //CW negative
+        //check how many are not ready for drive
+        int notReady = 0;
         for (int i = 0; i < 4; i++) {
             double currRad = swerveModules[i].getAbsoluteTurnPosition();
             
@@ -152,8 +166,6 @@ public class SwerveMaster {
             }
 
             //actually turn to the target angle using percentage speed depending on radDifference
-            //check how many are not ready for drive
-            int notReady = 0;
             //adjust tolerance             V
             if (Math.abs(radDifference) > 0.05) {
                 turns[i] = 0.5 * (radDifference / (Math.PI / 4)); //Max turn speed of 0.5 
@@ -178,8 +190,7 @@ public class SwerveMaster {
                     drives[i] = drives[i] * 0.95; //decelerate if not ready to drive
                 }
             }
-
-            return (notReady == 0) || (driveReady && notReady != 4);
         }
+        return (notReady == 0) || (driveReady && notReady != 4);
     }
 }

@@ -28,10 +28,10 @@ public class Robot extends TimedRobot {
     driveControllerFactor = 1d;
     mySwerveMaster = new SwerveMaster();
 
-    mySwerveMaster.leftUpModule.driveMotor.setIdleMode(IdleMode.kBrake);
-    mySwerveMaster.leftDownModule.driveMotor.setIdleMode(IdleMode.kBrake);
-    mySwerveMaster.rightUpModule.driveMotor.setIdleMode(IdleMode.kBrake);
-    mySwerveMaster.rightDownModule.driveMotor.setIdleMode(IdleMode.kBrake);
+    mySwerveMaster.swerveModules[0].driveMotor.setIdleMode(IdleMode.kBrake);
+    mySwerveMaster.swerveModules[1].driveMotor.setIdleMode(IdleMode.kBrake);
+    mySwerveMaster.swerveModules[2].driveMotor.setIdleMode(IdleMode.kBrake);
+    mySwerveMaster.swerveModules[3].driveMotor.setIdleMode(IdleMode.kBrake);
     mySwerveMaster.resetAccelerometer();
   }
 
@@ -69,10 +69,10 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Drive Factor: ", driveControllerFactor);
     SmartDashboard.putNumber("Drive Controller Left Y: ", driveController.getLeftY());
     SmartDashboard.putNumber("Drive Controller Right X: ", driveController.getRightX());
-    SmartDashboard.putNumber("Left Up Encoder: ", mySwerveMaster.leftUpModule.getAbsoluteTurnPosition());
-    SmartDashboard.putNumber("Left Down Encoder: ", mySwerveMaster.leftDownModule.getAbsoluteTurnPosition());
-    SmartDashboard.putNumber("Right Up Encoder: ", mySwerveMaster.rightUpModule.getAbsoluteTurnPosition());
-    SmartDashboard.putNumber("Right Down Encoder: ", mySwerveMaster.rightDownModule.getAbsoluteTurnPosition());
+    SmartDashboard.putNumber("Left Up Encoder: ", mySwerveMaster.swerveModules[0].getAbsoluteTurnPosition());
+    SmartDashboard.putNumber("Left Down Encoder: ", mySwerveMaster.swerveModules[1].getAbsoluteTurnPosition());
+    SmartDashboard.putNumber("Right Up Encoder: ", mySwerveMaster.swerveModules[2].getAbsoluteTurnPosition());
+    SmartDashboard.putNumber("Right Down Encoder: ", mySwerveMaster.swerveModules[3].getAbsoluteTurnPosition());
 
     mySwerveMaster.update(driveController, driveControllerFactor);
   }
@@ -80,7 +80,7 @@ public class Robot extends TimedRobot {
   @Override
   public void disabledInit() {
     SmartDashboard.putString("Current mode: ", "disabledInit");
-    mySwerveMaster.set(new double[]{0d, 0d, 0d, 0d}, new double[]{0d, 0d, 0d, 0d});
+    mySwerveMaster.disable();
   }
 
   @Override
@@ -136,30 +136,30 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Drive Controller Left Y: ", driveController.getLeftY());
     SmartDashboard.putNumber("Drive Controller Right X: ", driveController.getRightX());
     SmartDashboard.putNumber("Max Speed: ", maxSpeed);
-    SmartDashboard.putNumber("Left Up Encoder: ", mySwerveMaster.leftUpModule.getAbsoluteTurnPosition());
-    SmartDashboard.putNumber("Left Down Encoder: ", mySwerveMaster.leftDownModule.getAbsoluteTurnPosition());
-    SmartDashboard.putNumber("Right Up Encoder: ", mySwerveMaster.rightUpModule.getAbsoluteTurnPosition());
-    SmartDashboard.putNumber("Right Down Encoder: ", mySwerveMaster.rightDownModule.getAbsoluteTurnPosition());
+    SmartDashboard.putNumber("Left Up Encoder: ", mySwerveMaster.swerveModules[0].getAbsoluteTurnPosition());
+    SmartDashboard.putNumber("Left Down Encoder: ", mySwerveMaster.swerveModules[1].getAbsoluteTurnPosition());
+    SmartDashboard.putNumber("Right Up Encoder: ", mySwerveMaster.swerveModules[2].getAbsoluteTurnPosition());
+    SmartDashboard.putNumber("Right Down Encoder: ", mySwerveMaster.swerveModules[3].getAbsoluteTurnPosition());
 
 
     double leftY = Math.abs(driveController.getLeftY()) < Constants.driveControllerStopBelowThis ? 0.0 : driveController.getLeftY() * driveControllerFactor;
     //double rightX = Math.abs(driveController.getRightX()) < Constants.driveControllerStopBelowThis ? 0.0 : driveController.getRightX() * driveControllerFactor;
 
-    double[] turnSets = new double[]{0.05 * (7 * Math.PI / 4 - mySwerveMaster.leftUpModule.getAbsoluteTurnPosition()), 
-      0.025 * (Math.PI / 4 - (mySwerveMaster.leftDownModule.getAbsoluteTurnPosition() < 0 ? mySwerveMaster.leftDownModule.getAbsoluteTurnPosition() + Math.PI : mySwerveMaster.leftDownModule.getAbsoluteTurnPosition())), 
-      0.05 * (5 * Math.PI / 4 - mySwerveMaster.rightUpModule.getAbsoluteTurnPosition()), 
-      0.05 * (3 * Math.PI / 4 - mySwerveMaster.rightDownModule.getAbsoluteTurnPosition())};
+    double[] turnSets = new double[]{0.05 * (7 * Math.PI / 4 - mySwerveMaster.swerveModules[0].getAbsoluteTurnPosition()), 
+      0.025 * (Math.PI / 4 - (mySwerveMaster.swerveModules[1].getAbsoluteTurnPosition() < 0 ? mySwerveMaster.swerveModules[1].getAbsoluteTurnPosition() + Math.PI : mySwerveMaster.swerveModules[1].getAbsoluteTurnPosition())), 
+      0.05 * (5 * Math.PI / 4 - mySwerveMaster.swerveModules[2].getAbsoluteTurnPosition()), 
+      0.05 * (3 * Math.PI / 4 - mySwerveMaster.swerveModules[3].getAbsoluteTurnPosition())};
 
-      if(mySwerveMaster.leftUpModule.getAbsoluteTurnPosition() < Math.PI) {
+      if(mySwerveMaster.swerveModules[0].getAbsoluteTurnPosition() < Math.PI) {
         turnSets[0] *= -1;
       }
-      if(mySwerveMaster.leftDownModule.getAbsoluteTurnPosition() < Math.PI) {
+      if(mySwerveMaster.swerveModules[1].getAbsoluteTurnPosition() < Math.PI) {
         turnSets[1] *= -1;
       }
-      if(mySwerveMaster.rightUpModule.getAbsoluteTurnPosition() < Math.PI) {
+      if(mySwerveMaster.swerveModules[2].getAbsoluteTurnPosition() < Math.PI) {
         turnSets[2] *= -1;
       }
-      if(mySwerveMaster.rightDownModule.getAbsoluteTurnPosition() < Math.PI) {
+      if(mySwerveMaster.swerveModules[3].getAbsoluteTurnPosition() < Math.PI) {
         turnSets[3] *= -1;
       }
 
@@ -168,6 +168,6 @@ public class Robot extends TimedRobot {
       turnSets[2] = 0.0;
       turnSets[3] = 0.0;
 
-    mySwerveMaster.set(new double[]{leftY, leftY, leftY, leftY}, turnSets);
+    //mySwerveMaster.set(new double[]{leftY, leftY, leftY, leftY}, turnSets);
   }
 }
