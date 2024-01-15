@@ -159,11 +159,12 @@ public class SwerveMaster {
                 turns[i] = 0.5 * (radDifference / (Math.PI / 4)); //Max turn speed of 0.5 
 
                 //Min turn speed of 0.1
+                /* Maybe don't need this
                 if (radDifference < 0 && Math.abs(turns[i]) < 0.1) {
                     turns[i] = -0.1;
                 } else if (radDifference > 0 && Math.abs(turns[i]) < 0.1) {
                     turns[i] = 0.1;
-                } 
+                } */
                 notReady++;
                 drives[i] = drives[i] * 0.95; //decelerate if not on right angle
                 if (Math.abs(drives[i]) < 0.05) {  
