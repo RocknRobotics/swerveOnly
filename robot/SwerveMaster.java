@@ -122,13 +122,10 @@ public class SwerveMaster {
     //If this works, we need to somehow integrate turning 
     public boolean drive(double[] axisInput, double drivePower) {
         //get radian of left input axis
-        double targetRadian = Math.atan(axisInput[1] / axisInput[0]);
+        double targetRadian = Math.atan2(nums[i], nums[i + 1]) - (Math.PI / 2);
 
-        //adjust for quadrants II, III, and IV
-        if (axisInput[0] < 0) {
-            targetRadian += Math.PI;
-        } else if (axisInput[1] < 0) {
-            targetRadian += Math.PI;
+        if (targetRadian < 0) {
+            targetRadian += Math.PI * 2;
         }
         
         //run through each module and give them the correct turn speed
@@ -168,7 +165,7 @@ public class SwerveMaster {
             //actually turn to the target angle using percentage speed depending on radDifference
             //adjust tolerance             V
             if (Math.abs(radDifference) > 0.05) {
-                turns[i] = 0.5 * (radDifference / (Math.PI / 4)); //Max turn speed of 0.5 
+                turns[i] = 0.25 * (radDifference / (Math.PI / 4)); //Max turn speed of 0.5 
 
                 //Min turn speed of 0.1
                 /* Maybe don't need this
