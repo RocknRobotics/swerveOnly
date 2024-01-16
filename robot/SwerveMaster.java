@@ -121,6 +121,11 @@ public class SwerveMaster {
 
     //If this works, we need to somehow integrate turning 
     public boolean drive(double[] axisInput, double drivePower) {
+        //don't do anything if inputs are 0
+        if (axisInput[0] == 0 && axisInput[1] == 0) {
+            return false;
+        }
+        
         //get radian of left input axis
         double targetRadian = Math.atan2(axisInput[0], axisInput[1]) - (Math.PI / 2);
 
