@@ -2,7 +2,7 @@ package frc.robot;
 
 import com.revrobotics.CANSparkMax;
 import com.revrobotics.RelativeEncoder;
-import com.revrobotics.CANSparkMaxLowLevel.MotorType;
+import com.revrobotics.CANSparkLowLevel.MotorType;
 
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
@@ -29,9 +29,9 @@ public class SwerveModule {
         driveRelative = driveMotor.getEncoder();
         turnEncoder = new AnalogEncoder(turnEncoderID);
 
+        encoderOffset = offsetAngle;
         driveMotor.setInverted(driveMotorInvert);
         turnMotor.setInverted(turnMotorInvert);
-        this.encoderOffset = offsetAngle;
 
         this.encoderInvert = encoderInvert ? -1 : 1;
     }
@@ -42,8 +42,8 @@ public class SwerveModule {
     }
 
     public void set(double driveSet, double turnSet) {
-        driveMotor.set(driveSet - 0.25 * (driveSet - driveMotor.get()));
-        turnMotor.set(turnSet - 0.25 * (turnSet - turnMotor.get()));
+        driveMotor.set(driveSet);
+        turnMotor.set(turnSet);
     }
 
     //Metres position of the drive talon
@@ -53,11 +53,20 @@ public class SwerveModule {
 
     //Radians position of the turn talon
     public double getAbsoluteTurnPosition() {
-        return encoderInvert * turnEncoder.getAbsolutePosition() * turnConstants.radsPerRotation - encoderOffset;
+        //System.out.println("Raw Position " + Constants.counter++ + ": " + (turnEncoder.getAbsolutePosition() - encoderOffset));
+        double temp = encoderInvert * (turnEncoder.getAbsolutePosition() - encoderOffset) * turnConstants.radsPerRotation - Math.PI;
+
+        /*while(temp < 0) {
+            temp += Math.PI * 2;
+        }*/
+
+        //Constants.counter %= 4;
+
+        return -temp;
     }
 
     //Metres/second velocity of the drive talon
     public double getDriveVelocity() {
-        return driveRelative.getVelocity() * driveConstants.metresPerRotation;
+        return driveRelative.getVelocity() * driveConstants.metresPerRotation / 60.0d;
     }
 }
