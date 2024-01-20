@@ -38,7 +38,7 @@ public class SwerveModule {
 
     //Returns a SwerveModuleState representation of this SwerveModule
     public SwerveModuleState getState() {
-        return new SwerveModuleState(this.getDriveVelocity(), new Rotation2d(this.getAbsoluteTurnPosition()));
+        return new SwerveModuleState(getDriveVelocity(), Rotation2d.fromDegrees(getAbsoluteTurnPosition()));
     }
 
     public void set(double driveSet, double turnSet) {
