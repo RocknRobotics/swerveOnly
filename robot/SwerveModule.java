@@ -54,7 +54,8 @@ public class SwerveModule {
     //Radians position of the turn talon
     public double getAbsoluteTurnPosition() {
         //System.out.println("Raw Position " + Constants.counter++ + ": " + (turnEncoder.getAbsolutePosition() - encoderOffset));
-        double temp = encoderInvert * (turnEncoder.getAbsolutePosition()- encoderOffset) * turnConstants.degreesPerRotation - 180;
+        //NEW, degree calculations + removed the -180 (or pi) from the end
+        double temp = encoderInvert * (turnEncoder.getAbsolutePosition() - encoderOffset) * turnConstants.degreesPerRotation;
 
         //NEW
         //If negative subtract absolute value from 360 (assumes 0 is straight, so turning to the right would cause it to have a 

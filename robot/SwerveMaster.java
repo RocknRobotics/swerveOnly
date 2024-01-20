@@ -110,7 +110,7 @@ public class SwerveMaster {
     public void teleopUpdate(double[] inputs, double[] velocities, double[] positions, double reducedAngle) {
         //NEW
         SmartDashboard.putNumber("Yaw: ", accelerometer.getYaw());
-        SmartDashboard.putNumber("Reduced Yaw: ", getReducedAngle());
+        SmartDashboard.putNumber("Reduced Yaw: ", reducedAngle);
 
         turnSetController.setP(SmartDashboard.getNumber("kP: ", turnSetController.getP()));
         turnSetController.setI(SmartDashboard.getNumber("kI: ", turnSetController.getI()));
@@ -213,10 +213,10 @@ public class SwerveMaster {
 
         //Update odometry
         odometer.update(Rotation2d.fromDegrees(reducedAngle), new SwerveModulePosition[]{
-            new SwerveModulePosition(velocities[0], Rotation2d.fromRadians(positions[0])), 
-            new SwerveModulePosition(velocities[1], Rotation2d.fromRadians(positions[1])), 
-            new SwerveModulePosition(velocities[2], Rotation2d.fromRadians(positions[2])), 
-            new SwerveModulePosition(velocities[3], Rotation2d.fromRadians(positions[3]))});
+            new SwerveModulePosition(velocities[0], Rotation2d.fromDegrees(positions[0])), 
+            new SwerveModulePosition(velocities[1], Rotation2d.fromDegrees(positions[1])), 
+            new SwerveModulePosition(velocities[2], Rotation2d.fromDegrees(positions[2])), 
+            new SwerveModulePosition(velocities[3], Rotation2d.fromDegrees(positions[3]))});
 
         
         this.set(driveSets, turnSets);
