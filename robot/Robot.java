@@ -70,9 +70,14 @@ public class Robot extends TimedRobot {
       driveControllerFactor = 1d;
     }
 
-      SmartDashboard.putNumber("Drive Factor: ", driveControllerFactor);
-      SmartDashboard.putNumber("Drive Controller Left Y: ", driveController.getLeftY());
-      SmartDashboard.putNumber("Drive Controller Right X: ", driveController.getRightX());
+    //NEW, since accelerometer will need to be reset due to inaccuracies accumulating
+    if(driveController.getOptionsButtonPressed()) {
+      mySwerveMaster.resetAccelerometer();
+    }
+
+    SmartDashboard.putNumber("Drive Factor: ", driveControllerFactor);
+    SmartDashboard.putNumber("Drive Controller Left Y: ", driveController.getLeftY());
+    SmartDashboard.putNumber("Drive Controller Right X: ", driveController.getRightX());
 
     mySwerveMaster.update(driveController, driveControllerFactor);
   }

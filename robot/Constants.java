@@ -32,6 +32,7 @@ public final class Constants {
             //The amount of radians per rotation of the turn motor (Size of "wheel" being rotated doesn't matter---One full rotation
             //of any size wheel equals 2 radians)
             public static final double radsPerRotation = gearRatio * 2 * Math.PI;
+            public static final double degreesPerRotation = 360 * radsPerRotation / (2 * Math.PI);
 
             public static final int leftUpID = 5;
             public static final int leftDownID = 6;

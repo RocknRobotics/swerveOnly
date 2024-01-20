@@ -54,15 +54,20 @@ public class SwerveModule {
     //Radians position of the turn talon
     public double getAbsoluteTurnPosition() {
         //System.out.println("Raw Position " + Constants.counter++ + ": " + (turnEncoder.getAbsolutePosition() - encoderOffset));
-        double temp = encoderInvert * (turnEncoder.getAbsolutePosition() - encoderOffset) * turnConstants.radsPerRotation - Math.PI;
+        double temp = encoderInvert * (turnEncoder.getAbsolutePosition()- encoderOffset) * turnConstants.degreesPerRotation - 180;
 
-        /*while(temp < 0) {
-            temp += Math.PI * 2;
-        }*/
+        //NEW
+        //If negative subtract absolute value from 360 (assumes 0 is straight, so turning to the right would cause it to have a 
+        //negative value when it should be closer to 360)
+        if(temp < 0) {
+            temp = 360 + temp;
+        }
 
         //Constants.counter %= 4;
 
-        return -temp;
+        //NEW
+        //Originally had negative, trying with it positive again
+        return temp;
     }
 
     //Metres/second velocity of the drive talon
