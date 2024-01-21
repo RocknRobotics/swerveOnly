@@ -68,7 +68,7 @@ public class SwerveModule {
 
         //NEW
         //Originally had negative, trying with it positive again
-        return temp;
+        return -temp;
     }
 
     //Metres/second velocity of the drive talon

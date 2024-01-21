@@ -63,9 +63,9 @@ public class SwerveMaster {
         }
 
         //NEW, ternaries before calculating factor allows lower speeds when the drive factor is low
-        teleopUpdate(new double[]{controller.getLeftX() < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftX() * factor, 
-            controller.getLeftY() < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftY() * factor, 
-            controller.getRightX() < Constants.driveControllerStopBelowThis ? 0.0 : controller.getRightX() * factor}, 
+        teleopUpdate(new double[]{Math.abs(controller.getLeftX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftX() * factor, 
+            Math.abs(controller.getLeftY()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftY() * factor, 
+            Math.abs(controller.getRightX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getRightX() * factor}, 
         new double[]{leftUpModule.getDriveVelocity(), leftDownModule.getDriveVelocity(), rightUpModule.getDriveVelocity(), rightDownModule.getDriveVelocity()}, 
         new double[]{leftUpModule.getAbsoluteTurnPosition(), leftDownModule.getAbsoluteTurnPosition(), rightUpModule.getAbsoluteTurnPosition(), rightDownModule.getAbsoluteTurnPosition()}, 
         this.getReducedAngle());
@@ -197,7 +197,7 @@ public class SwerveMaster {
                 driveSets[i] = targetStates[i].speedMetersPerSecond / (Constants.motorConstants.driveConstants.maxSpeed * Constants.motorConstants.driveConstants.metresPerRotation / 60.0d);
                 SmartDashboard.putNumber("Drive Set " + i + ": ", driveSets[i]);
                 turnSets[i] = turnPIDController.calculate(positions[i], targetStates[i].angle.getDegrees());
-                SmartDashboard.putNumber("Turn Set " + i + ": ", turnSets[i]);
+                SmartDashboard.putNumber("RawTurn Set " + i + ": ", turnSets[i]);
             }
         }
 
@@ -205,6 +205,11 @@ public class SwerveMaster {
         turnSets[1] = turnSetController.calculate(leftDownModule.turnMotor.get(), turnSets[1]);
         turnSets[2] = turnSetController.calculate(rightUpModule.turnMotor.get(), turnSets[2]);
         turnSets[3] = turnSetController.calculate(rightDownModule.turnMotor.get(), turnSets[3]);
+
+        //Actually turn the angles into a speed
+        for (int i = 0; i < 4; i++) {
+            turnSets[i] /= 180;
+        }
 
         SmartDashboard.putNumber("Turn Set 0: ", turnSets[0]);
         SmartDashboard.putNumber("Turn Set 1: ", turnSets[1]);
