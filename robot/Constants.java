@@ -50,10 +50,10 @@ public final class Constants {
 
             //TODO
             //Encoder offsets---the values of the encoders when the module is in the "0" position (facing forward or whatever)
-            public static final double leftUpOffset = 0.037448048774097;//3.332876340894647;
-            public static final double leftDownOffset = 2.066832339784717;//5.164710060094233;//1.981625914295975;
-            public static final double rightUpOffset = 0.045249725602034;//0.060853079257908;
-            public static final double rightDownOffset = 0.07177542681702;//0.070215091451432;
+            public static final double leftUpOffset = 0.0;//0.037448048774097
+            public static final double leftDownOffset = 2.066832339784717;//1.981625914295975;
+            public static final double rightUpOffset = 0.0;//0.045249725602034;
+            public static final double rightDownOffset = 0.0;//0.07177542681702
 
             //TODO
             public static final boolean leftUpEncoderInvert = false;
@@ -78,8 +78,8 @@ public final class Constants {
             public static final int rightDownID = 4;
 
             //TODO
-            public static final boolean leftUpInvert = true;//false;
-            public static final boolean leftDownInvert = false;//true;
+            public static final boolean leftUpInvert = false;//false;
+            public static final boolean leftDownInvert = true;//true;
             public static final boolean rightUpInvert = true;
             public static final boolean rightDownInvert = true; //Done
 

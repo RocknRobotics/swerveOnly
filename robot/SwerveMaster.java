@@ -122,17 +122,29 @@ public class SwerveMaster {
     //If this works, we need to somehow integrate turning 
     public boolean drive(double[] axisInput, double drivePower) {
         //don't do anything if inputs are 0
+    
+
         if (axisInput[0] == 0 && axisInput[1] == 0) {
+            turns[0] = 0;            
+            turns[1] = 0;
+            turns[2] = 0;
+            turns[3] = 0;
+            drives[0] = 0;            
+            drives[1] = 0;
+            drives[2] = 0;
+            drives[3] = 0;
             return false;
         }
         
         //get radian of left input axis
-        double targetRadian = Math.atan2(axisInput[0], axisInput[1]) - (Math.PI / 2);
+        double targetRadian = Math.atan2(axisInput[1], axisInput[0]) + Math.PI / 2;
 
+        
         if (targetRadian < 0) {
             targetRadian += Math.PI * 2;
         }
-        
+        System.out.println("Target-------------------------- " + targetRadian);
+
         //run through each module and give them the correct turn speed
         //CCW positive
         //CW negative
@@ -143,42 +155,21 @@ public class SwerveMaster {
             
             //calculate position of current rad relative to target rad
             double radDifference = targetRadian - currRad;
-
-            //account for targetRad and currRad being on opposite sides of wrap
-            if (Math.abs(radDifference) > Math.abs(targetRadian - (currRad + Math.PI * 2))) {
-                radDifference = targetRadian - (currRad + Math.PI * 2);
-            } else if (Math.abs(radDifference) > Math.abs((targetRadian + Math.PI * 2) - currRad)) {
-                radDifference = (targetRadian + Math.PI * 2) - currRad;
-            } 
-
-            //allows better efficiency by turning smaller angle then inverting drive
-            if (Math.abs(radDifference) > Math.PI / 2) {
-                if (targetRadian >= Math.PI) {
-                    targetRadian -= Math.PI;
-                } else {
-                    targetRadian += Math.PI;
-                }
-
-                if (radDifference > 0) {
-                    radDifference -= Math.PI;
-                } else {
-                    radDifference += Math.PI;
-                }
-                swerveModules[i].invertDrive();
-            }
+            
+            System.out.println("Turn this way: " + i + ": " + radDifference + "\nWant to go to: " + targetRadian + "\nIs at radian: " + currRad);   
+            
+            /*if (Math.abs(radDifference) > Math.abs(targetRadian - currRad + Math.PI * 2)) {
+                radDifference = targetRadian - currRad + Math.PI * 2;
+            } else if (Math.abs(radDifference) > Math.abs(targetRadian - currRad - Math.PI * 2)) {
+                radDifference = targetRadian - currRad - Math.PI * 2;
+            }*/
 
             //actually turn to the target angle using percentage speed depending on radDifference
             //adjust tolerance             V
-            if (Math.abs(radDifference) > 0.05) {
-                turns[i] = 0.25 * (radDifference / (Math.PI / 4)); //Max turn speed of 0.5 
-
-                //Min turn speed of 0.1
-                /* Maybe don't need this
-                if (radDifference < 0 && Math.abs(turns[i]) < 0.1) {
-                    turns[i] = -0.1;
-                } else if (radDifference > 0 && Math.abs(turns[i]) < 0.1) {
-                    turns[i] = 0.1;
-                } */
+            if (Math.abs(radDifference) > 0.1) {
+                turns[i] = 0.1 * radDifference; 
+                System.out.println("True way to go: " + i + ": " + radDifference + "\nGoing: " + turns[i]);
+    
                 notReady++;
                 drives[i] = drives[i] * 0.95; //decelerate if not on right angle
                 if (Math.abs(drives[i]) < 0.05) {  
@@ -187,7 +178,7 @@ public class SwerveMaster {
             } else {
                 turns[i] = 0; 
                 if (driveReady) { //accelerate if on right angle and ready to drive
-                    drives[i] += drivePower * (1 - (drives[i] / drivePower)) / 4;
+                    drives[i] += (drivePower - drives[i]) * 0.25;
                 } else {
                     drives[i] = drives[i] * 0.95; //decelerate if not ready to drive
                 }

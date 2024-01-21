@@ -53,7 +53,11 @@ public class SwerveModule {
 
     //Radians position of the turn talon
     public double getAbsoluteTurnPosition() {
-        return encoderInvert * turnEncoder.getAbsolutePosition() * turnConstants.radsPerRotation - encoderOffset;
+        double rad = encoderInvert * turnEncoder.getAbsolutePosition() * turnConstants.radsPerRotation - encoderOffset;
+        if (rad < 0) {
+            rad += Math.PI * 2;
+        }
+        return rad;
     }
 
     //Metres/second velocity of the drive talon
