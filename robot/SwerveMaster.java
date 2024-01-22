@@ -50,10 +50,10 @@ public class SwerveMaster {
         turnSetController = new PIDController(0.8, 0.0, 0.0);
 
         odometer = new SwerveDriveOdometry(driveConstants.drivemotorKinematics, getRotation2d(), new SwerveModulePosition[]{
-            new SwerveModulePosition(0.0, Rotation2d.fromDegrees(leftUpModule.getAbsoluteTurnPosition())), 
-            new SwerveModulePosition(0.0, Rotation2d.fromDegrees(leftDownModule.getAbsoluteTurnPosition())), 
-            new SwerveModulePosition(0.0, Rotation2d.fromDegrees(rightUpModule.getAbsoluteTurnPosition())), 
-            new SwerveModulePosition(0.0, Rotation2d.fromDegrees(rightDownModule.getAbsoluteTurnPosition()))});
+            new SwerveModulePosition(Math.sqrt(2) * Constants.driveConstants.leftToRightDistanceMetres, Rotation2d.fromDegrees(135)), 
+            new SwerveModulePosition(Math.sqrt(2) * Constants.driveConstants.leftToRightDistanceMetres, Rotation2d.fromDegrees(225)), 
+            new SwerveModulePosition(Math.sqrt(2) * Constants.driveConstants.leftToRightDistanceMetres, Rotation2d.fromDegrees(45)), 
+            new SwerveModulePosition(Math.sqrt(2) * Constants.driveConstants.leftToRightDistanceMetres, Rotation2d.fromDegrees(315))});
     }
 
     public void update(PS4Controller controller, double factor) {
@@ -90,15 +90,15 @@ public class SwerveMaster {
         //You've got to be joking the darn navx is cw positive when we need ccw positive readings
         double temp = -accelerometer.getAngle() % 360;
         //NEW
-        //Ranges from -180 to 180
+        //Ranges from 180 to -180
         //Make it 0 to 360
-        if(temp== 180) {
+        if(temp == 180) {
             return temp;
         }else if(temp < 0) {
-            return -temp;
+            return 360 + temp;
         } else {
-            //Greater than add 180 to make it 180-360
-            return 360 - temp;
+            //Greater than add 180 leave it as is
+            return temp;
         }
     }
 
@@ -108,6 +108,13 @@ public class SwerveMaster {
 
     //Does the heavy lifting
     public void teleopUpdate(double[] inputs, double[] velocities, double[] positions, double reducedAngle) {
+        //Update odometry
+        odometer.update(Rotation2d.fromDegrees(reducedAngle), new SwerveModulePosition[]{
+            new SwerveModulePosition(velocities[0], Rotation2d.fromDegrees(positions[0])), 
+            new SwerveModulePosition(velocities[1], Rotation2d.fromDegrees(positions[1])), 
+            new SwerveModulePosition(velocities[2], Rotation2d.fromDegrees(positions[2])), 
+            new SwerveModulePosition(velocities[3], Rotation2d.fromDegrees(positions[3]))});
+
         //NEW
         SmartDashboard.putNumber("Yaw: ", accelerometer.getYaw());
         SmartDashboard.putNumber("Reduced Yaw: ", reducedAngle);
@@ -134,13 +141,15 @@ public class SwerveMaster {
         //Fourth is robot angle
         //Input[0] == left/right, input[1] == up/down, input[2] == left/right (turn)
         //So first == input[1], second == -input[0], and third == -input[2]?
-        double controllerAngle = Math.atan2(-inputs[1], inputs[0]) - Math.PI / 2;
+        /*double controllerAngle = Math.atan2(-inputs[1], inputs[0]) - Math.PI / 2;
         if(controllerAngle < 0) {
             controllerAngle += Math.PI * 2;
         }
         double angleDifference = controllerAngle - this.getReducedAngle() * Math.PI / 180;
         ChassisSpeeds desiredSpeeds = ChassisSpeeds.fromRobotRelativeSpeeds((this.getReducedAngle() < 180 ? 1 : -1) * (Math.cos(angleDifference) < 0 ? -1 : 1) * Math.abs(inputs[1]) * Constants.maxTranslationalSpeed, 
-        (this.getReducedAngle() < 90 || this.getReducedAngle() > 270 ? -1 : 1) * (Math.sin(angleDifference) < 0 ? -1 : 1) * Math.abs(inputs[0]) * Constants.maxTranslationalSpeed, inputs[2] * Constants.maxAngularSpeed, Rotation2d.fromDegrees(reducedAngle));
+        (this.getReducedAngle() < 90 || this.getReducedAngle() > 270 ? -1 : 1) * (Math.sin(angleDifference) < 0 ? -1 : 1) * Math.abs(inputs[0]) * Constants.maxTranslationalSpeed, inputs[2] * Constants.maxAngularSpeed, getRotation2d());*/
+        ChassisSpeeds desiredSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(-inputs[1] * Constants.maxTranslationalSpeed, 
+        input[0] * Constants.maxTranslationalSpeed, inputs[2] * maxAngularSpeed, odometer.getPoseMeters().getRotation());
         //Converts those speeds to targetStates since I'm not a monster who puts everything on one line (I had to resist the urge to)
         SwerveModuleState[] targetStates = Constants.motorConstants.driveConstants.drivemotorKinematics.toSwerveModuleStates(desiredSpeeds);
 
@@ -223,13 +232,6 @@ public class SwerveMaster {
         SmartDashboard.putNumber("Turn Set 1: ", turnSets[1]);
         SmartDashboard.putNumber("Turn Set 2: ", turnSets[2]);
         SmartDashboard.putNumber("Turn Set 3: ", turnSets[3]);
-
-        //Update odometry
-        odometer.update(Rotation2d.fromDegrees(reducedAngle), new SwerveModulePosition[]{
-            new SwerveModulePosition(velocities[0], Rotation2d.fromDegrees(positions[0])), 
-            new SwerveModulePosition(velocities[1], Rotation2d.fromDegrees(positions[1])), 
-            new SwerveModulePosition(velocities[2], Rotation2d.fromDegrees(positions[2])), 
-            new SwerveModulePosition(velocities[3], Rotation2d.fromDegrees(positions[3]))});
 
         
         this.set(driveSets, turnSets);
