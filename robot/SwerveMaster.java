@@ -181,10 +181,10 @@ public class SwerveMaster {
         targetStates[2].angle = Rotation2d.fromDegrees(targetStates[2].angle.getDegrees() + odometer.getPoseMeters().getRotation().getDegrees() * 2 * (proportionXY));
         targetStates[3].angle = Rotation2d.fromDegrees(targetStates[3].angle.getDegrees() + odometer.getPoseMeters().getRotation().getDegrees() * 2 * (proportionXY));
         //NEW
-        targetStates[0].angle = Rotation2d.fromDegrees(targetStates[0].angle.getDegrees() - odometer.getPoseMeters().getRotation().getDegrees() * proportion2);
-        targetStates[1].angle = Rotation2d.fromDegrees(targetStates[1].angle.getDegrees() - odometer.getPoseMeters().getRotation().getDegrees() * proportion2);
-        targetStates[2].angle = Rotation2d.fromDegrees(targetStates[2].angle.getDegrees() - odometer.getPoseMeters().getRotation().getDegrees() * proportion2);
-        targetStates[3].angle = Rotation2d.fromDegrees(targetStates[3].angle.getDegrees() - odometer.getPoseMeters().getRotation().getDegrees() * proportion2);
+        targetStates[0].angle = Rotation2d.fromDegrees(targetStates[0].angle.getDegrees() - odometer.getPoseMeters().getRotation().getDegrees() * proportion2 * proportionXY);
+        targetStates[1].angle = Rotation2d.fromDegrees(targetStates[1].angle.getDegrees() - odometer.getPoseMeters().getRotation().getDegrees() * proportion2 * proportionXY);
+        targetStates[2].angle = Rotation2d.fromDegrees(targetStates[2].angle.getDegrees() - odometer.getPoseMeters().getRotation().getDegrees() * proportion2 * proportionXY);
+        targetStates[3].angle = Rotation2d.fromDegrees(targetStates[3].angle.getDegrees() - odometer.getPoseMeters().getRotation().getDegrees() * proportion2 * proportionXY);
 
         SmartDashboard.putNumber("Target State 0 Speed: ", targetStates[0].speedMetersPerSecond);
         SmartDashboard.putNumber("Target State 1 Speed: ", targetStates[1].speedMetersPerSecond);
