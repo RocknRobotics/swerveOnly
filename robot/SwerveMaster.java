@@ -180,6 +180,11 @@ public class SwerveMaster {
         targetStates[1].angle = Rotation2d.fromDegrees(targetStates[1].angle.getDegrees() + odometer.getPoseMeters().getRotation().getDegrees() * 2 * (proportionXY));
         targetStates[2].angle = Rotation2d.fromDegrees(targetStates[2].angle.getDegrees() + odometer.getPoseMeters().getRotation().getDegrees() * 2 * (proportionXY));
         targetStates[3].angle = Rotation2d.fromDegrees(targetStates[3].angle.getDegrees() + odometer.getPoseMeters().getRotation().getDegrees() * 2 * (proportionXY));
+        //NEW
+        targetStates[0].angle = Rotation2d.fromDegrees(targetStates[0].angle.getDegrees() - odometer.getPoseMeters().getRotation().getDegrees() * proportion2);
+        targetStates[1].angle = Rotation2d.fromDegrees(targetStates[1].angle.getDegrees() - odometer.getPoseMeters().getRotation().getDegrees() * proportion2);
+        targetStates[2].angle = Rotation2d.fromDegrees(targetStates[2].angle.getDegrees() - odometer.getPoseMeters().getRotation().getDegrees() * proportion2);
+        targetStates[3].angle = Rotation2d.fromDegrees(targetStates[3].angle.getDegrees() - odometer.getPoseMeters().getRotation().getDegrees() * proportion2);
 
         SmartDashboard.putNumber("Target State 0 Speed: ", targetStates[0].speedMetersPerSecond);
         SmartDashboard.putNumber("Target State 1 Speed: ", targetStates[1].speedMetersPerSecond);
@@ -204,7 +209,11 @@ public class SwerveMaster {
                     targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() - 360);
                 }
 
-                SwerveModuleState.optimize(targetStates[i], Rotation2d.fromDegrees(positions[i]));
+                //NEW---manual optimisation
+                if(Math.abs(positions[i] - targetStates[i].angle.getDegrees()) >= 180) {
+                    targetStates[i].speedMetersPerSecond = -targetStates[i].speedMetersPerSecond;
+                    targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() - 180);
+                }
 
                 //NEW
                 while(targetStates[i].angle.getDegrees() < 0) {
@@ -229,6 +238,7 @@ public class SwerveMaster {
         turnSets[3] = turnSetController.calculate(rightDownModule.turnMotor.get(), turnSets[3]);
 
         //Actually turn the angles into a speed
+        //Thanks Kevin
         for (int i = 0; i < 4; i++) {
             turnSets[i] /= 180;
         }
