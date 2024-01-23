@@ -208,6 +208,13 @@ public class SwerveMaster {
                 while(targetStates[i].angle.getDegrees() > 360) {
                     targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() - 360);
                 }
+                //NEW---guarantee position is 0-360
+                while(positions[i] < 0) {
+                    positions[i] += 360;
+                }
+                while(positions[i] > 360) {
+                    positions[i] -= 360;
+                }
 
                 //NEW---manual optimisation
                 if(Math.abs(positions[i] - targetStates[i].angle.getDegrees()) >= 180) {
