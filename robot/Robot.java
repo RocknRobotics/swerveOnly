@@ -2,6 +2,8 @@ package frc.robot;
 
 import com.revrobotics.CANSparkBase;
 
+import edu.wpi.first.hal.CANAPIJNI;
+import edu.wpi.first.hal.can.CANJNI;
 import edu.wpi.first.wpilibj.PS4Controller;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
