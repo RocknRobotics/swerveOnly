@@ -46,7 +46,7 @@ public class SwerveMaster {
 
         turnPIDController = new PIDController(Constants.motorConstants.turnConstants.kP, 0d, 0);
         //NEW, changed max/min input and changed kp to 0.8 (it's what worked when testing---probably don't change it for now)
-        turnPIDController.enableContinuousInput(0, 360);
+        turnPIDController.enableContinuousInput(-180 180);
         turnSetController = new PIDController(0.8, 0.0, 0.0);
 
         odometer = new SwerveDriveOdometry(driveConstants.drivemotorKinematics, getRotation2d(), new SwerveModulePosition[]{
@@ -122,10 +122,10 @@ public class SwerveMaster {
         turnSetController.setD(SmartDashboard.getNumber("kD: ", turnSetController.getD()));
         turnSetController.setTolerance(SmartDashboard.getNumber("Position Tolerance: ", turnSetController.getPositionTolerance()), SmartDashboard.getNumber("Velocity Tolerance: ", turnSetController.getVelocityTolerance()));
 
-        SmartDashboard.putNumber("Current 0 Angle: ", leftUpModule.getState().angle.getDegrees());
-        SmartDashboard.putNumber("Current 1 Angle: ", leftDownModule.getState().angle.getDegrees());
-        SmartDashboard.putNumber("Current 2 Angle: ", rightUpModule.getState().angle.getDegrees());
-        SmartDashboard.putNumber("Current 3 Angle: ", rightDownModule.getState().angle.getDegrees());
+        SmartDashboard.putNumber("Current 0 Angle: ", leftUpModule.getAbsoluteTurnPosition());
+        SmartDashboard.putNumber("Current 1 Angle: ", leftDownModule.getAbsoluteTurnPosition());
+        SmartDashboard.putNumber("Current 2 Angle: ", rightUpModule.getAbsoluteTurnPosition());
+        SmartDashboard.putNumber("Current 3 Angle: ", rightDownModule.getAbsoluteTurnPosition());
 
         //NEW, deleted this for loop. Needs to be put back if you add an i component to the turnSetController (ensures integral doesn't accumulate forever)
         
@@ -218,7 +218,7 @@ public class SwerveMaster {
                     targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() + 360);
                 }
 
-                //Optimization
+                /*//Optimization
                 if(Math.abs(targetStates[i].angle.getDegrees() - positions[i]) >= 180) {
                     targetStates[i].angle = Rotation2d.fromDegrees(360 - (targetStates[i].angle.getDegrees() - positions[i]));
                 }
@@ -255,7 +255,7 @@ public class SwerveMaster {
                 }
                 if(targetStates[i].angle.getDegrees() < -90 && positions[i] > 90) {
                     targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() + 360);
-                }
+                }*/
 
                 //SwerveModuleState.optimize(targetStates[i], Rotation2d.fromDegrees(positions[i]));
 
@@ -271,19 +271,19 @@ public class SwerveMaster {
                 SmartDashboard.putNumber("Optimized State " + i + " Angle: ", targetStates[i].angle.getDegrees());
                 driveSets[i] = targetStates[i].speedMetersPerSecond / (Constants.motorConstants.driveConstants.maxSpeed * Constants.motorConstants.driveConstants.metresPerRotation / 60.0d);
                 SmartDashboard.putNumber("Drive Set " + i + ": ", driveSets[i]);
-                //turnSets[i] = turnPIDController.calculate(positions[i], targetStates[i].angle.getDegrees());
-                //SmartDashboard.putNumber("RawTurn Set " + i + ": ", turnSets[i]);
+                turnSets[i] = turnPIDController.calculate(positions[i], targetStates[i].angle.getDegrees());
+                SmartDashboard.putNumber("RawTurn Set " + i + ": ", turnSets[i]);
             }
         }
 
-        /*turnSets[0] = turnSetController.calculate(leftUpModule.turnMotor.get(), turnSets[0]);
+        turnSets[0] = turnSetController.calculate(leftUpModule.turnMotor.get(), turnSets[0]);
         turnSets[1] = turnSetController.calculate(leftDownModule.turnMotor.get(), turnSets[1]);
         turnSets[2] = turnSetController.calculate(rightUpModule.turnMotor.get(), turnSets[2]);
-        turnSets[3] = turnSetController.calculate(rightDownModule.turnMotor.get(), turnSets[3]);*/
+        turnSets[3] = turnSetController.calculate(rightDownModule.turnMotor.get(), turnSets[3]);
 
         //Actually turn the angles into a speed
         for (int i = 0; i < 4; i++) {
-            turnSets[i] = (targetStates[i].angle.getDegrees() - positions[i]) / 90d;
+            turnSets[i] /= 180d;
         }
 
         SmartDashboard.putNumber("Turn Set 0: ", turnSets[0]);
