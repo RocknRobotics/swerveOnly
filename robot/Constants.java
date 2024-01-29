@@ -89,13 +89,6 @@ public final class Constants {
             public static final double leftToRightDistanceMetres = 0.685d;
             //Distance in metres between the "up" wheels and the "down" wheels
             public static final double upToDownDistanceMetres = 0.685d;
-
-            //Order--- leftUp, leftDown, rightUp, rightDown
-            public static final SwerveDriveKinematics drivemotorKinematics = new SwerveDriveKinematics(
-                new Translation2d(upToDownDistanceMetres / 2d, leftToRightDistanceMetres / 2d), 
-                new Translation2d(-upToDownDistanceMetres / 2d, leftToRightDistanceMetres / 2d), 
-                new Translation2d(upToDownDistanceMetres / 2d, -leftToRightDistanceMetres / 2d), 
-                new Translation2d(-upToDownDistanceMetres / 2d, -leftToRightDistanceMetres / 2d));
         }
     }
 }

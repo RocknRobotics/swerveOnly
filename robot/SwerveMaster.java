@@ -54,12 +54,19 @@ public class SwerveMaster {
         turnPIDController = new PIDController(Constants.motorConstants.turnConstants.kP, 0d, 0);
         //NEW, changed max/min input and changed kp to 0.8 (it's what worked when testing---probably don't change it for now)
         turnPIDController.enableContinuousInput(0, 360);
-        turnSetController = new PIDController(0.8, 0.0, 0.0);
 
+        //Ideally, this is the actual x/y/heading of the robot, as calculated from wheel/motor kinematics stuff
         currentX = 0d;
         currentY = 0d;
         currentHeading = 0d;
 
+        //Somehow, this needs to be the desired x/y/heading of the robot as determined from the controller
+        //Hard part is taking into account friction and stuff?
+        //Overall, the goal of this was to prevent the case where moving it back and forth causes it to turn slightly
+        //(sometimes majorly). Worse though, is driving and turning causes drift in the direction of the turn.
+        //I don't care how the fix to this is implemented, literally whatever you think will work, go for it
+        //A small amount of error of x/y and heading is expected to accumulate over time due to discrepancies between wheel kinematics and reality as well as error accumulation on the gyro itself,
+        //what I want fixed is the rapid accumulation caused by driving/turning and the slight turning caused during translational movement
         desiredX = 0d;
         desiredY = 0d;
         desiredHeading = 0d;
@@ -127,11 +134,6 @@ public class SwerveMaster {
         SmartDashboard.putNumber("Yaw: ", accelerometer.getYaw());
         SmartDashboard.putNumber("Reduced Yaw: ", reducedAngle);
 
-        turnSetController.setP(SmartDashboard.getNumber("kP: ", turnSetController.getP()));
-        turnSetController.setI(SmartDashboard.getNumber("kI: ", turnSetController.getI()));
-        turnSetController.setD(SmartDashboard.getNumber("kD: ", turnSetController.getD()));
-        turnSetController.setTolerance(SmartDashboard.getNumber("Position Tolerance: ", turnSetController.getPositionTolerance()), SmartDashboard.getNumber("Velocity Tolerance: ", turnSetController.getVelocityTolerance()));
-
         SmartDashboard.putNumber("Current 0 Angle: ", leftUpModule.getAbsoluteTurnPosition());
         SmartDashboard.putNumber("Current 1 Angle: ", leftDownModule.getAbsoluteTurnPosition());
         SmartDashboard.putNumber("Current 2 Angle: ", rightUpModule.getAbsoluteTurnPosition());
@@ -149,52 +151,79 @@ public class SwerveMaster {
         //Fourth is robot angle
         //Input[0] == left/right, input[1] == up/down, input[2] == left/right (turn)
         //So first == input[1], second == -input[0], and third == -input[2]?
-        /*double controllerAngle = Math.atan2(-inputs[1], inputs[0]) - Math.PI / 2;
-        if(controllerAngle < 0) {
-            controllerAngle += Math.PI * 2;
-        }
-        double angleDifference = controllerAngle - this.getReducedAngle() * Math.PI / 180;
-        ChassisSpeeds desiredSpeeds = ChassisSpeeds.fromRobotRelativeSpeeds((this.getReducedAngle() < 180 ? 1 : -1) * (Math.cos(angleDifference) < 0 ? -1 : 1) * Math.abs(inputs[1]) * Constants.maxTranslationalSpeed, 
-        (this.getReducedAngle() < 90 || this.getReducedAngle() > 270 ? -1 : 1) * (Math.sin(angleDifference) < 0 ? -1 : 1) * Math.abs(inputs[0]) * Constants.maxTranslationalSpeed, inputs[2] * Constants.maxAngularSpeed, getRotation2d());*/
+
+
+        //Convert inputs to desired values---doesn't apply translation/rotation limit yet
+        //Doesn't seem right... why multiply by controllerFactor?
         double desiredVx = -inputs[1] * Constants.maxTranslationalSpeed * Robot.driveControllerFactor;
         double desiredVy = inputs[0] * Constants.maxTranslationalSpeed * Robot.driveControllerFactor;
         double desiredOmega = -inputs[2] * Constants.maxAngularSpeed * Robot.driveControllerFactor;
+        //The desired global translational vector of each wheel as described by angle and magnitude
         double[] translationalAngles = new double[4];
         double[] translationalMagnitude = new double[4];
+        //Desired turning vector of each wheel
         double[] rotationalAngles =  new double[4];
         double[] rotationalMagnitude = new double[4];
+        //Combined desired relative vector of each wheel as determined by the translational and turn vectors
         double[] desiredAngle = new double[4];
         double[] desiredMagnitude = new double[4];
 
+        //Necessary since when converting inputs to proportions, division by 0 occurs if all inputs are 0
+        //Then the result will be NaN, causing undefined behaviour
         if(inputs[0] == 0 && inputs[1] == 0 && inputs[2] == 0) {
             set(driveSets, turnSets);
             return;
         }
 
+        //For ease of access
         SwerveModule[] moduleList = new SwerveModule[]{leftUpModule, leftDownModule, rightUpModule, rightDownModule};
+        //The list of the desired relative angle of each motor if turning right
         double[] angleListOne = new double[]{135d, 225d, 45d, 315d};
+        //Turning left
         double[] angleListTwo = new double[]{315d, 45d, 225d, 135d};
 
         for(int i = 0; i < 4; i++) {
+            //Calculating the angle of the global desired angle of the translational vector
             translationalAngles[i] = Math.atan2(-inputs[0], -inputs[1]) + Math.PI * 2;
+            //Making sure range is 0 to 2pi
             if(translationalAngles[i] > Math.PI * 2) {
                 translationalAngles[i] -= Math.PI * 2;
             }
+            //Converting to degrees (0 to 360)
             translationalAngles[i] *= 180 / Math.PI;
+            //Subtracting the gyro angle to make the angle robot relative
+            //Don't need to check range since cos and sin functions don't care about that
+            //Does that mean the first range check isn't necessary?
             translationalAngles[i] -= reducedAngle;
+            //Calculating the translational magnitude as the proportion of the translational
+            //inputs multiplied by the max speed... definitely not the right way to get the magnitude
+            //since it doesn't take into account the actual input values---only the proportion
             translationalMagnitude[i] = Constants.maxTranslationalSpeed * Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2)) / Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2) + Math.pow(inputs[2], 2));
+            //Above but for rotational. Since translational magnitude is in metres, I converted
+            //a max speed of 2pi to metres, which is equivalent to traveling the circumference
+            //of the circle the wheels lie on, so thus I multiplied by the robot circumference
+            //Again, not correct, but it at least worked
             rotationalMagnitude[i] = Constants.motorConstants.driveConstants.leftToRightDistanceMetres * Math.PI * Math.abs(inputs[2]) / Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2) + Math.pow(inputs[2], 2));
+            //Setting the rotational angle based on whether turning left/right
+            //If no rotation, then the magnitude is zero, so it doesn't matter what the angle is
             if(inputs[2] < 0) {
                 rotationalAngles[i] = angleListOne[i];
             } else {
                 rotationalAngles[i] = angleListTwo[i];
             }
 
+            //Formula for converting from two vectors with a given magnitude and angle
+            //Into an x and y value. Guess I got lucky that the x and y weren't switched?
             double tempX = translationalMagnitude[i] * Math.cos(translationalAngles[i] * Math.PI / 180) 
                 + rotationalMagnitude[i] * Math.cos(rotationalAngles[i] * Math.PI / 180);
             double tempY = translationalMagnitude[i] * Math.sin(translationalAngles[i] * Math.PI / 180) 
                 + rotationalMagnitude[i] * Math.sin(rotationalAngles[i] * Math.PI / 180);
 
+            //Need to check if no translational or rotational input since that would make x/y 0 possibly,
+            //And then atan2 might have undefined behaviour?
+            //Wtf that just doesn't seem right at all
+            //Isn't x/y being 0 possible if the angle between the two vectors results in 0/90/180/etc?
+            //Also I think atan2 handles 0s anyways?
             if(inputs[0] == 0 && inputs[1] == 0) {
                 tempX = rotationalMagnitude[i] * Math.cos(rotationalAngles[i] * Math.PI / 180);
                 tempY = rotationalMagnitude[i] * Math.sin(rotationalAngles[i] * Math.PI / 180);
@@ -203,18 +232,29 @@ public class SwerveMaster {
                 tempY = translationalMagnitude[i] * Math.sin(translationalAngles[i] * Math.PI / 180);
             }
 
+            //Getting the relative desired angle of the vector for this wheel
             desiredAngle[i] = Math.atan2(tempX, tempY) * 180 / Math.PI;
+            //Ensures it's in the right range for the purposes of setting the turn motor
             if(desiredAngle[i] <= 0) {
                 desiredAngle[i] += 360;
             }
+            //?
+            //I don't know why this is here
+            //Clearly necessary though since the robot drove correctly though
             desiredAngle[i] -= 90;
             if(desiredAngle[i] <= 0) {
                 desiredAngle[i] += 360;
             }
+            //Getting the magnitude via the pythagorean theorem
             desiredMagnitude[i] = Math.sqrt(Math.pow(tempX, 2) + Math.pow(tempY, 2));
 
+            //Oh yeah forgot to mention I added optimisation while I was at it
             int driveSetInvert = 1;
 
+            //turnPIDController takes into account the wrap from 0 to 360, so using it when calculating whether
+            //it's optimal to add/subtract 180 for reversing actually results in it at most turning 90 probably
+            //Not certain that 90 is the most it turns
+            //Also should probably divide by 90 then? (Or 180 if I was wrong in assuming 90 is the most it can turn)
             if(Math.abs(turnPIDController.calculate(positions[i], desiredAngle[i])) >= Math.abs(turnPIDController.calculate(positions[i], desiredAngle[i] + 180))) {
                 driveSetInvert = -1;
                 turnSets[i] = turnPIDController.calculate(positions[i], desiredAngle[i] + 180) / 360d;
@@ -225,8 +265,20 @@ public class SwerveMaster {
                 turnSets[i] = turnPIDController.calculate(positions[i], desiredAngle[i]) / 360d;
             }
 
+            //So, if figured it's fine if the turnSets are always allowed to operate at max power, since the module will
+            //turn to a certain angle and then the motor turns off---it's not like driving is affected
+
+            //Drive though, needs to be variable based on motor inputs and the controller factor
+            //This attempts to convert all three inputs into a range from 0 to 1 (remember invert takes care
+            //of making it negative if needed).
+            //However, this does not work as desired, since anything above about a 0.5 controller factor results in the speed
+            //not changing since the motors are already going as fast as they can.
+            //As a temporary fix, I've made the controller factor range 0 to 0.5
+            //Please actually make the driveSet stuff correct so the controller range can be 0 to 1 again
+
             driveSets[i] = driveSetInvert * -desiredMagnitude[i] * (Math.min(1, Math.abs(inputs[2]) + Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2))));
 
+            //Debugging purposes
             SmartDashboard.putNumber("Translational Angle " + i + ": ", translationalAngles[i]);
             SmartDashboard.putNumber("Translational Magnitude " + i + ": ", translationalMagnitude[i]);
             SmartDashboard.putNumber("Rotational Angle " + i + ": ", rotationalAngles[i]);
