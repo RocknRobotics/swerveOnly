@@ -15,6 +15,7 @@ import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj.I2C.Port;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.PS4Controller;
+import edu.wpi.first.wpilibj.Timer;
 
 public class SwerveMaster {
     public SwerveModule leftUpModule;
@@ -24,12 +25,18 @@ public class SwerveMaster {
 
     public AHRS accelerometer;
 
-    private SwerveDriveOdometry odometer;
-
     //Enables continious input I think? I'm writing this using another person's code as a guide---I'll mess around with changing
     //this once we have the swerve drive built
     private PIDController turnPIDController;
     private PIDController turnSetController;
+
+    private double currentX;
+    private double currentY;
+    private double currentHeading;
+
+    private double desiredX;
+    private double desiredY;
+    private double desiredHeading;
 
     public SwerveMaster() {
         leftUpModule = new SwerveModule(driveConstants.leftUpID, turnConstants.leftUpID, turnConstants.leftUpEncoderID, driveConstants.leftUpInvert, 
@@ -46,14 +53,16 @@ public class SwerveMaster {
 
         turnPIDController = new PIDController(Constants.motorConstants.turnConstants.kP, 0d, 0);
         //NEW, changed max/min input and changed kp to 0.8 (it's what worked when testing---probably don't change it for now)
-        turnPIDController.enableContinuousInput(-180 180);
+        turnPIDController.enableContinuousInput(0, 360);
         turnSetController = new PIDController(0.8, 0.0, 0.0);
 
-        odometer = new SwerveDriveOdometry(driveConstants.drivemotorKinematics, getRotation2d(), new SwerveModulePosition[]{
-            new SwerveModulePosition(Math.sqrt(2) * Constants.motorConstants.driveConstants.leftToRightDistanceMetres, Rotation2d.fromDegrees(135)), 
-            new SwerveModulePosition(Math.sqrt(2) * Constants.motorConstants.driveConstants.leftToRightDistanceMetres, Rotation2d.fromDegrees(225)), 
-            new SwerveModulePosition(Math.sqrt(2) * Constants.motorConstants.driveConstants.leftToRightDistanceMetres, Rotation2d.fromDegrees(45)), 
-            new SwerveModulePosition(Math.sqrt(2) * Constants.motorConstants.driveConstants.leftToRightDistanceMetres, Rotation2d.fromDegrees(315))});
+        currentX = 0d;
+        currentY = 0d;
+        currentHeading = 0d;
+
+        desiredX = 0d;
+        desiredY = 0d;
+        desiredHeading = 0d;
     }
 
     public void update(PS4Controller controller, double factor) {
@@ -80,6 +89,14 @@ public class SwerveMaster {
 
     public void resetAccelerometer() {
         accelerometer.reset();
+
+        currentX = 0d;
+        currentY = 0d;
+        currentHeading = 0d;
+
+        desiredX = 0d;
+        desiredY = 0d;
+        desiredHeading = 0d;
     }
 
     public boolean accelerometerIsCalibrating() {
@@ -90,10 +107,10 @@ public class SwerveMaster {
         //You've got to be joking the darn navx is cw positive when we need ccw positive readings
         double temp = -accelerometer.getAngle();
         
-        while(temp <= -180) {
+        while(temp <= 0) {
             temp += 360;
         }
-        while(temp > 180) {
+        while(temp > 360) {
             temp -= 360;
         }
 
@@ -106,13 +123,6 @@ public class SwerveMaster {
 
     //Does the heavy lifting
     public void teleopUpdate(double[] inputs, double[] velocities, double[] positions, double reducedAngle) {
-        //Update odometry
-        odometer.update(Rotation2d.fromDegrees(reducedAngle), new SwerveModulePosition[]{
-            new SwerveModulePosition(velocities[0], Rotation2d.fromDegrees(positions[0])), 
-            new SwerveModulePosition(velocities[1], Rotation2d.fromDegrees(positions[1])), 
-            new SwerveModulePosition(velocities[2], Rotation2d.fromDegrees(positions[2])), 
-            new SwerveModulePosition(velocities[3], Rotation2d.fromDegrees(positions[3]))});
-
         //NEW
         SmartDashboard.putNumber("Yaw: ", accelerometer.getYaw());
         SmartDashboard.putNumber("Reduced Yaw: ", reducedAngle);
@@ -146,164 +156,89 @@ public class SwerveMaster {
         double angleDifference = controllerAngle - this.getReducedAngle() * Math.PI / 180;
         ChassisSpeeds desiredSpeeds = ChassisSpeeds.fromRobotRelativeSpeeds((this.getReducedAngle() < 180 ? 1 : -1) * (Math.cos(angleDifference) < 0 ? -1 : 1) * Math.abs(inputs[1]) * Constants.maxTranslationalSpeed, 
         (this.getReducedAngle() < 90 || this.getReducedAngle() > 270 ? -1 : 1) * (Math.sin(angleDifference) < 0 ? -1 : 1) * Math.abs(inputs[0]) * Constants.maxTranslationalSpeed, inputs[2] * Constants.maxAngularSpeed, getRotation2d());*/
-        ChassisSpeeds desiredSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(-inputs[1] * Constants.maxTranslationalSpeed, 
-        inputs[0] * Constants.maxTranslationalSpeed, inputs[2] * Constants.maxAngularSpeed, getRotation2d());
-        //Converts those speeds to targetStates since I'm not a monster who puts everything on one line (I had to resist the urge to)
-        SwerveModuleState[] targetStates = Constants.motorConstants.driveConstants.drivemotorKinematics.toSwerveModuleStates(desiredSpeeds);
+        double desiredVx = -inputs[1] * Constants.maxTranslationalSpeed * Robot.driveControllerFactor;
+        double desiredVy = inputs[0] * Constants.maxTranslationalSpeed * Robot.driveControllerFactor;
+        double desiredOmega = -inputs[2] * Constants.maxAngularSpeed * Robot.driveControllerFactor;
+        double[] translationalAngles = new double[4];
+        double[] translationalMagnitude = new double[4];
+        double[] rotationalAngles =  new double[4];
+        double[] rotationalMagnitude = new double[4];
+        double[] desiredAngle = new double[4];
+        double[] desiredMagnitude = new double[4];
 
-        SmartDashboard.putNumber("Desired X Speed: ", desiredSpeeds.vxMetersPerSecond);
-        SmartDashboard.putNumber("Desired Y Speed: ", desiredSpeeds.vyMetersPerSecond);
-        SmartDashboard.putNumber("Desired Omega Speed: ", desiredSpeeds.omegaRadiansPerSecond);
+        if(inputs[0] == 0 && inputs[1] == 0 && inputs[2] == 0) {
+            set(driveSets, turnSets);
+            return;
+        }
 
-        //Scales the targetStates in case it's not physically possible (for example it's impossible to go the true full move velocity 
-        //and true full rotational velocity at the same time)
-        /*Constants.motorConstants.driveConstants.drivemotorKinematics.toChassisSpeeds(
-            new SwerveModuleState[]{new SwerveModuleState(velocities[0], Rotation2d.fromRadians(positions[0])), 
-            new SwerveModuleState(velocities[1], Rotation2d.fromRadians(positions[1])), 
-            new SwerveModuleState(velocities[2], Rotation2d.fromRadians(positions[2])), 
-            new SwerveModuleState(velocities[3], Rotation2d.fromRadians(positions[3]))})*/
-
-        //NEW, commented this out for now (if you comment it back in use the whiles in the for loop below to make degree range 0 to 360)
-        SwerveDriveKinematics.desaturateWheelSpeeds(targetStates, desiredSpeeds, Constants.motorConstants.driveConstants.maxSpeed / 60.0d * Constants.motorConstants.driveConstants.metresPerRotation, 
-        Constants.maxTranslationalSpeed, Constants.maxAngularSpeed);
-
-        double proportion2 = Math.abs(inputs[2]) * inputs[2] / Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2) + Math.pow(inputs[2], 2));
-        double proportionXY = Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2)) / Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2) + Math.pow(inputs[2], 2));
-
-        targetStates[0].angle = Rotation2d.fromDegrees(targetStates[0].angle.getDegrees() + ((inputs[2] < 0 ? 1 : -1) * proportion2 * (1 / Robot.driveControllerFactor) * 90));
-        targetStates[1].angle = Rotation2d.fromDegrees(targetStates[1].angle.getDegrees() - ((inputs[2] < 0 ? 1 : -1) * proportion2 * (1 / Robot.driveControllerFactor) * 90));
-        targetStates[2].angle = Rotation2d.fromDegrees(targetStates[2].angle.getDegrees() - ((inputs[2] < 0 ? 1 : -1) * proportion2 * (1 / Robot.driveControllerFactor) * 90));
-        targetStates[3].angle = Rotation2d.fromDegrees(targetStates[3].angle.getDegrees() + ((inputs[2] < 0 ? 1 : -1) * proportion2 * (1 / Robot.driveControllerFactor) * 90));
-        targetStates[0].angle = Rotation2d.fromDegrees(targetStates[0].angle.getDegrees() + getReducedAngle() * 2 * (proportionXY));
-        targetStates[1].angle = Rotation2d.fromDegrees(targetStates[1].angle.getDegrees() + getReducedAngle() * 2 * (proportionXY));
-        targetStates[2].angle = Rotation2d.fromDegrees(targetStates[2].angle.getDegrees() + getReducedAngle() * 2 * (proportionXY));
-        targetStates[3].angle = Rotation2d.fromDegrees(targetStates[3].angle.getDegrees() + getReducedAngle() * 2 * (proportionXY));
-
-        /*
-        targetStates[0].angle = Rotation2d.fromDegrees(targetStates[0].angle.getDegrees() - getReducedAngle() * proportion2 * proportionXY);
-        targetStates[1].angle = Rotation2d.fromDegrees(targetStates[1].angle.getDegrees() - getReducedAngle() * proportion2 * proportionXY);
-        targetStates[2].angle = Rotation2d.fromDegrees(targetStates[2].angle.getDegrees() - getReducedAngle() * proportion2 * proportionXY);
-        targetStates[3].angle = Rotation2d.fromDegrees(targetStates[3].angle.getDegrees() - getReducedAngle() * proportion2 * proportionXY);
-        */
+        SwerveModule[] moduleList = new SwerveModule[]{leftUpModule, leftDownModule, rightUpModule, rightDownModule};
+        double[] angleListOne = new double[]{135d, 225d, 45d, 315d};
+        double[] angleListTwo = new double[]{315d, 45d, 225d, 135d};
 
         for(int i = 0; i < 4; i++) {
-            while(targetStates[i].angle.getDegrees() <= -180) {
-                targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() + 360);
+            translationalAngles[i] = Math.atan2(-inputs[0], -inputs[1]) + Math.PI * 2;
+            if(translationalAngles[i] > Math.PI * 2) {
+                translationalAngles[i] -= Math.PI * 2;
             }
-            while(targetStates[i].angle.getDegrees() > 180) {
-                targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() - 360);
-            }
-        }
-
-        SmartDashboard.putNumber("Target State 0 Speed: ", targetStates[0].speedMetersPerSecond);
-        SmartDashboard.putNumber("Target State 1 Speed: ", targetStates[1].speedMetersPerSecond);
-        SmartDashboard.putNumber("Target State 2 Speed: ", targetStates[2].speedMetersPerSecond);
-        SmartDashboard.putNumber("Target State 3 Speed: ", targetStates[3].speedMetersPerSecond);
-        SmartDashboard.putNumber("Target State 0 Angle: ", targetStates[0].angle.getDegrees());
-        SmartDashboard.putNumber("Target State 1 Angle: ", targetStates[1].angle.getDegrees());
-        SmartDashboard.putNumber("Target State 2 Angle: ", targetStates[2].angle.getDegrees());
-        SmartDashboard.putNumber("Target State 3 Angle: ", targetStates[3].angle.getDegrees());
-
-        //Optimize the states
-        for(int i = 0; i < targetStates.length; i++) {
-            if(Math.abs(targetStates[i].speedMetersPerSecond) < Constants.motorConstants.driveConstants.stopBelowThisVelocity) {
-                driveSets[i] = 0d;
-                turnSets[i] = 0d;
+            translationalAngles[i] *= 180 / Math.PI;
+            translationalAngles[i] -= reducedAngle;
+            translationalMagnitude[i] = Constants.maxTranslationalSpeed * Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2)) / Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2) + Math.pow(inputs[2], 2));
+            rotationalMagnitude[i] = Constants.motorConstants.driveConstants.leftToRightDistanceMetres * Math.PI * Math.abs(inputs[2]) / Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2) + Math.pow(inputs[2], 2));
+            if(inputs[2] < 0) {
+                rotationalAngles[i] = angleListOne[i];
             } else {
-                //Fix wrapping issues
-                if(targetStates[i].angle.getDegrees() > 90 && positions[i] < -90) {
-                    targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() - 360);
-                }
-                if(targetStates[i].angle.getDegrees() < -90 && positions[i] > 90) {
-                    targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() + 360);
-                }
-
-                /*//Optimization
-                if(Math.abs(targetStates[i].angle.getDegrees() - positions[i]) >= 180) {
-                    targetStates[i].angle = Rotation2d.fromDegrees(360 - (targetStates[i].angle.getDegrees() - positions[i]));
-                }
-
-                //Make sure range + wrap is correct
-                while(targetStates[i].angle.getDegrees() <= -180) {
-                    targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() + 360);
-                }
-                while(targetStates[i].angle.getDegrees() > 180) {
-                    targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() - 360);
-                }
-                if(targetStates[i].angle.getDegrees() > 90 && positions[i] < -90) {
-                    targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() - 360);
-                }
-                if(targetStates[i].angle.getDegrees() < -90 && positions[i] > 90) {
-                    targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() + 360);
-                }
-
-                //Optimization 2
-                if(Math.abs(targetStates[i].angle.getDegrees() - positions[i]) >= 90) {
-                    targetStates[i].speedMetersPerSecond = -targetStates[i].speedMetersPerSecond;
-                    targetStates[i].angle = Rotation2d.fromDegrees(180 - (targetStates[i].angle.getDegrees() - positions[i]));
-                }
-
-                //Make sure range + wrap is correct
-                while(targetStates[i].angle.getDegrees() <= -180) {
-                    targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() + 360);
-                }
-                while(targetStates[i].angle.getDegrees() > 180) {
-                    targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() - 360);
-                }
-                if(targetStates[i].angle.getDegrees() > 90 && positions[i] < -90) {
-                    targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() - 360);
-                }
-                if(targetStates[i].angle.getDegrees() < -90 && positions[i] > 90) {
-                    targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() + 360);
-                }*/
-
-                //SwerveModuleState.optimize(targetStates[i], Rotation2d.fromDegrees(positions[i]));
-
-                //NEW
-                /*while(targetStates[i].angle.getDegrees() <= -180) {
-                    targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() + 360);
-                }
-                while(targetStates[i].angle.getDegrees() > 180) {
-                    targetStates[i].angle = Rotation2d.fromDegrees(targetStates[i].angle.getDegrees() - 360);
-                }*/
-
-                SmartDashboard.putNumber("Optimized State " + i + " Speed: ", targetStates[i].speedMetersPerSecond);
-                SmartDashboard.putNumber("Optimized State " + i + " Angle: ", targetStates[i].angle.getDegrees());
-                driveSets[i] = targetStates[i].speedMetersPerSecond / (Constants.motorConstants.driveConstants.maxSpeed * Constants.motorConstants.driveConstants.metresPerRotation / 60.0d);
-                SmartDashboard.putNumber("Drive Set " + i + ": ", driveSets[i]);
-                turnSets[i] = turnPIDController.calculate(positions[i], targetStates[i].angle.getDegrees());
-                SmartDashboard.putNumber("RawTurn Set " + i + ": ", turnSets[i]);
+                rotationalAngles[i] = angleListTwo[i];
             }
+
+            double tempX = translationalMagnitude[i] * Math.cos(translationalAngles[i] * Math.PI / 180) 
+                + rotationalMagnitude[i] * Math.cos(rotationalAngles[i] * Math.PI / 180);
+            double tempY = translationalMagnitude[i] * Math.sin(translationalAngles[i] * Math.PI / 180) 
+                + rotationalMagnitude[i] * Math.sin(rotationalAngles[i] * Math.PI / 180);
+
+            if(inputs[0] == 0 && inputs[1] == 0) {
+                tempX = rotationalMagnitude[i] * Math.cos(rotationalAngles[i] * Math.PI / 180);
+                tempY = rotationalMagnitude[i] * Math.sin(rotationalAngles[i] * Math.PI / 180);
+            } else if(inputs[2] == 0) {
+                tempX = translationalMagnitude[i] * Math.cos(translationalAngles[i] * Math.PI / 180);
+                tempY = translationalMagnitude[i] * Math.sin(translationalAngles[i] * Math.PI / 180);
+            }
+
+            desiredAngle[i] = Math.atan2(tempX, tempY) * 180 / Math.PI;
+            if(desiredAngle[i] <= 0) {
+                desiredAngle[i] += 360;
+            }
+            desiredAngle[i] -= 90;
+            if(desiredAngle[i] <= 0) {
+                desiredAngle[i] += 360;
+            }
+            desiredMagnitude[i] = Math.sqrt(Math.pow(tempX, 2) + Math.pow(tempY, 2));
+
+            int driveSetInvert = 1;
+
+            if(Math.abs(turnPIDController.calculate(positions[i], desiredAngle[i])) >= Math.abs(turnPIDController.calculate(positions[i], desiredAngle[i] + 180))) {
+                driveSetInvert = -1;
+                turnSets[i] = turnPIDController.calculate(positions[i], desiredAngle[i] + 180) / 360d;
+            } else if(Math.abs(turnPIDController.calculate(positions[i], desiredAngle[i])) >= Math.abs(turnPIDController.calculate(positions[i], desiredAngle[i] - 180))) {
+                driveSetInvert = -1;
+                turnSets[i] = turnPIDController.calculate(positions[i], desiredAngle[i] - 180) / 360d;
+            } else {
+                turnSets[i] = turnPIDController.calculate(positions[i], desiredAngle[i]) / 360d;
+            }
+
+            driveSets[i] = driveSetInvert * -desiredMagnitude[i] * (Math.min(1, Math.abs(inputs[2]) + Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2))));
+
+            SmartDashboard.putNumber("Translational Angle " + i + ": ", translationalAngles[i]);
+            SmartDashboard.putNumber("Translational Magnitude " + i + ": ", translationalMagnitude[i]);
+            SmartDashboard.putNumber("Rotational Angle " + i + ": ", rotationalAngles[i]);
+            SmartDashboard.putNumber("Rotational Magnitude " + i + ": ", rotationalMagnitude[i]);
+            SmartDashboard.putNumber("Combined X " + i + ": ", tempX);
+            SmartDashboard.putNumber("Combined Y " + i + ": ", tempY);
+            SmartDashboard.putNumber("Desired Angle " + i + ": ", desiredAngle[i]);
+            SmartDashboard.putNumber("Desired Magnitude " + i + ": ", desiredMagnitude[i]);
+            SmartDashboard.putNumber("Turn Set " + i + ": ", turnSets[i]);
+            SmartDashboard.putNumber("Drive Set " + i + ": ", driveSets[i]);
         }
 
-        turnSets[0] = turnSetController.calculate(leftUpModule.turnMotor.get(), turnSets[0]);
-        turnSets[1] = turnSetController.calculate(leftDownModule.turnMotor.get(), turnSets[1]);
-        turnSets[2] = turnSetController.calculate(rightUpModule.turnMotor.get(), turnSets[2]);
-        turnSets[3] = turnSetController.calculate(rightDownModule.turnMotor.get(), turnSets[3]);
-
-        //Actually turn the angles into a speed
-        for (int i = 0; i < 4; i++) {
-            turnSets[i] /= 180d;
-        }
-
-        SmartDashboard.putNumber("Turn Set 0: ", turnSets[0]);
-        SmartDashboard.putNumber("Turn Set 1: ", turnSets[1]);
-        SmartDashboard.putNumber("Turn Set 2: ", turnSets[2]);
-        SmartDashboard.putNumber("Turn Set 3: ", turnSets[3]);
-
-        
-        this.set(driveSets, turnSets);
-    }
-
-    public Pose2d getPose() {
-        return odometer.getPoseMeters();
-    }
-
-    public void resetOdometer(double[] velocities, double[] positions, double reducedAngle, Pose2d currPose) {
-        odometer.resetPosition(Rotation2d.fromDegrees(reducedAngle), new SwerveModulePosition[]{
-            new SwerveModulePosition(velocities[0], Rotation2d.fromDegrees(positions[0])), 
-            new SwerveModulePosition(velocities[1], Rotation2d.fromDegrees(positions[1])), 
-            new SwerveModulePosition(velocities[2], Rotation2d.fromDegrees(positions[2])), 
-            new SwerveModulePosition(velocities[3], Rotation2d.fromDegrees(positions[3]))}, currPose);
+        set(driveSets, turnSets);
     }
 }

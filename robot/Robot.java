@@ -62,14 +62,16 @@ public class Robot extends TimedRobot {
 
     if(driveController.getTouchpadPressed()) {
       driveControllerFactor = 0d;
+    } else if(driveController.getShareButtonPressed()) {
+      driveControllerFactor = 0.1d;
     } else if(driveController.getSquareButtonPressed()) {
-      driveControllerFactor = 0.25d;
+      driveControllerFactor = 0.2d;
     } else if(driveController.getCrossButtonPressed()) {
-      driveControllerFactor = 0.5d;
+      driveControllerFactor = 0.3d;
     } else if(driveController.getCircleButtonPressed()) {
-      driveControllerFactor = 0.75d;
+      driveControllerFactor = 0.4d;
     } else if(driveController.getTriangleButtonPressed()) {
-      driveControllerFactor = 1d;
+      driveControllerFactor = 0.5d;
     }
 
     //NEW, since accelerometer will need to be reset due to inaccuracies accumulating

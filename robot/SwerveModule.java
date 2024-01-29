@@ -7,6 +7,7 @@ import com.revrobotics.CANSparkLowLevel.MotorType;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj.AnalogEncoder;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Constants.motorConstants.*;
 
 //The class is used to represent a drive talon and turn talon that are part of one the swerve modules
@@ -53,16 +54,22 @@ public class SwerveModule {
 
     //Radians position of the turn talon
     public double getAbsoluteTurnPosition() {
-        //System.out.println("Raw Position " + Constants.counter++ + ": " + (turnEncoder.getAbsolutePosition() - encoderOffset));
+        //SmartDashboard.putNumber("Raw Position " + Constants.counter + ": ", (turnEncoder.getAbsolutePosition() - encoderOffset));
         //NEW, degree calculations + removed the -180 (or pi) from the end
-        double temp = encoderInvert * (turnEncoder.getAbsolutePosition() - encoderOffset) * turnConstants.degreesPerRotation;
+        double temp = 180 - encoderInvert * (turnEncoder.getAbsolutePosition() - encoderOffset) * turnConstants.degreesPerRotation;
 
-        while(temp <= -180) {
+        while(temp <= 0) {
             temp += 360;
         }
-        while(temp > 180) {
+        while(temp > 360) {
             temp -= 360;
         }
+
+        /*SmartDashboard.putNumber("Temp Position " + Constants.counter++ + ": ", temp);
+
+        if(Constants.counter == 4) {
+            Constants.counter = 0;
+        }*/
 
         return temp;
     }
