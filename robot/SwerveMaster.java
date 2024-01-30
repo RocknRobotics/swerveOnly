@@ -84,7 +84,7 @@ public class SwerveMaster {
             Math.abs(controller.getRightX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getRightX() * factor}, 
         new double[]{leftUpModule.getDriveVelocity(), leftDownModule.getDriveVelocity(), rightUpModule.getDriveVelocity(), rightDownModule.getDriveVelocity()}, 
         new double[]{leftUpModule.getAbsoluteTurnPosition(), leftDownModule.getAbsoluteTurnPosition(), rightUpModule.getAbsoluteTurnPosition(), rightDownModule.getAbsoluteTurnPosition()}, 
-        this.getReducedAngle());
+        this.getReducedAngle(), factor);
     }
 
     public void set(double[] driveSets, double[] turnSets) {
@@ -129,7 +129,7 @@ public class SwerveMaster {
     }
 
     //Does the heavy lifting
-    public void teleopUpdate(double[] inputs, double[] velocities, double[] positions, double reducedAngle) {
+    public void teleopUpdate(double[] inputs, double[] velocities, double[] positions, double reducedAngle, double factor) {
         //NEW
         SmartDashboard.putNumber("Yaw: ", accelerometer.getYaw());
         SmartDashboard.putNumber("Reduced Yaw: ", reducedAngle);
@@ -198,8 +198,7 @@ public class SwerveMaster {
             //Calculating the translational magnitude as the proportion of the translational
             //inputs multiplied by the max speed... definitely not the right way to get the magnitude
             //since it doesn't take into account the actual input values---only the proportion
-            translationalMagnitude[i] = Constants.maxTranslationalSpeed * Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2)) / Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2) + Math.pow(inputs[2], 2));
-            //Above but for rotational. Since translational magnitude is in metres, I converted
+            translationalMagnitude[i] = Constants.maxTranslationalSpeed * Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2)) / Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2) + Math.pow(inputs[2], 2));            //Above but for rotational. Since translational magnitude is in metres, I converted
             //a max speed of 2pi to metres, which is equivalent to traveling the circumference
             //of the circle the wheels lie on, so thus I multiplied by the robot circumference
             //Again, not correct, but it at least worked
@@ -248,6 +247,10 @@ public class SwerveMaster {
             //Getting the magnitude via the pythagorean theorem
             desiredMagnitude[i] = Math.sqrt(Math.pow(tempX, 2) + Math.pow(tempY, 2));
 
+            if (desiredMagnitude[i] > Constants.maxTranslationalSpeed) {
+                desiredMagnitude[i] = (Constants.maxTranslationalSpeed / desiredMagnitude[i]) * desiredMagnitude[i];
+            }
+
             //Oh yeah forgot to mention I added optimisation while I was at it
             int driveSetInvert = 1;
 
@@ -275,18 +278,24 @@ public class SwerveMaster {
             //not changing since the motors are already going as fast as they can.
             //As a temporary fix, I've made the controller factor range 0 to 0.5
             //Please actually make the driveSet stuff correct so the controller range can be 0 to 1 again
-
-            driveSets[i] = driveSetInvert * -desiredMagnitude[i] * (Math.min(1, Math.abs(inputs[2]) + Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2))));
-
+            
+            //Kevin - Reduce this temp thing down to controller factor
+            double temp = (Math.min(1, Math.abs(inputs[2]) + Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2))));
+            if (temp > factor) {
+                temp = factor;
+            }
+            //Kevin - Divided desired magnitude by max speed
+            driveSets[i] = driveSetInvert * -desiredMagnitude[i] / Constants.maxTranslationalSpeed * temp;
+    
             //Debugging purposes
-            SmartDashboard.putNumber("Translational Angle " + i + ": ", translationalAngles[i]);
-            SmartDashboard.putNumber("Translational Magnitude " + i + ": ", translationalMagnitude[i]);
-            SmartDashboard.putNumber("Rotational Angle " + i + ": ", rotationalAngles[i]);
-            SmartDashboard.putNumber("Rotational Magnitude " + i + ": ", rotationalMagnitude[i]);
+            SmartDashboard.putNumber("Trans Ang " + i + ": ", translationalAngles[i]);
+            SmartDashboard.putNumber("Trans Mag " + i + ": ", translationalMagnitude[i]);
+            SmartDashboard.putNumber("Rot Ang " + i + ": ", rotationalAngles[i]);
+            SmartDashboard.putNumber("Rot Mag " + i + ": ", rotationalMagnitude[i]);
             SmartDashboard.putNumber("Combined X " + i + ": ", tempX);
             SmartDashboard.putNumber("Combined Y " + i + ": ", tempY);
-            SmartDashboard.putNumber("Desired Angle " + i + ": ", desiredAngle[i]);
-            SmartDashboard.putNumber("Desired Magnitude " + i + ": ", desiredMagnitude[i]);
+            SmartDashboard.putNumber("Desired Ang " + i + ": ", desiredAngle[i]);
+            SmartDashboard.putNumber("Desired Mag " + i + ": ", desiredMagnitude[i]);
             SmartDashboard.putNumber("Turn Set " + i + ": ", turnSets[i]);
             SmartDashboard.putNumber("Drive Set " + i + ": ", driveSets[i]);
         }

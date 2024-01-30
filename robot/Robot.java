@@ -22,7 +22,7 @@ public class Robot extends TimedRobot {
     SmartDashboard.putString("Current mode: ", "robotInit");
 
     driveController = new PS4Controller(Constants.driveControllerPort);
-    driveControllerFactor = 1d;
+    driveControllerFactor = 0.2d;
     mySwerveMaster = new SwerveMaster();
 
     mySwerveMaster.leftUpModule.driveMotor.setIdleMode(CANSparkBase.IdleMode.kBrake);
@@ -53,7 +53,7 @@ public class Robot extends TimedRobot {
 
   @Override
   public void teleopPeriodic() {
-    SmartDashboard.putString("Current mode: ", "teleopPeriodic");
+    SmartDashboard.putString("Mode: ", "teleopPeriodic");
 
     if(driveController.getTouchpadPressed()) {
       driveControllerFactor = 0d;
@@ -75,15 +75,16 @@ public class Robot extends TimedRobot {
     }
 
     SmartDashboard.putNumber("Drive Factor: ", driveControllerFactor);
-    SmartDashboard.putNumber("Drive Controller Left Y: ", driveController.getLeftY());
-    SmartDashboard.putNumber("Drive Controller Right X: ", driveController.getRightX());
+    SmartDashboard.putNumber("DC Left X: ", driveController.getLeftX());    
+    SmartDashboard.putNumber("DC Left Y: ", driveController.getLeftY());
+    SmartDashboard.putNumber("DC Right X: ", driveController.getRightX());
 
     mySwerveMaster.update(driveController, driveControllerFactor);
   }
 
   @Override
   public void disabledInit() {
-    SmartDashboard.putString("Current mode: ", "disabledInit");
+    SmartDashboard.putString("Mode: ", "disabledInit");
     mySwerveMaster.set(new double[]{0d, 0d, 0d, 0d}, new double[]{0d, 0d, 0d, 0d});
   }
 
