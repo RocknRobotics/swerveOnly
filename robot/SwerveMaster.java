@@ -72,19 +72,19 @@ public class SwerveMaster {
         desiredHeading = 0d;
     }
 
-    public void update(PS4Controller controller, double factor) {
-        if(factor == 0) {
+    public void update(PS4Controller controller, double driveFactor, double turnFactor) {
+        if(driveFactor == 0) {
             this.set(new double[]{0, 0, 0, 0}, new double[]{0, 0, 0, 0});
             return;
         }
 
         //NEW, ternaries before calculating factor allows lower speeds when the drive factor is low
-        teleopUpdate(new double[]{Math.abs(controller.getLeftX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftX() * factor, 
-            Math.abs(controller.getLeftY()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftY() * factor, 
-            Math.abs(controller.getRightX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getRightX() * factor}, 
+        teleopUpdate(new double[]{Math.abs(controller.getLeftX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftX() * driveFactor, 
+            Math.abs(controller.getLeftY()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftY() * driveFactor, 
+            Math.abs(controller.getRightX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getRightX() * turnFactor}, 
         new double[]{leftUpModule.getDriveVelocity(), leftDownModule.getDriveVelocity(), rightUpModule.getDriveVelocity(), rightDownModule.getDriveVelocity()}, 
         new double[]{leftUpModule.getAbsoluteTurnPosition(), leftDownModule.getAbsoluteTurnPosition(), rightUpModule.getAbsoluteTurnPosition(), rightDownModule.getAbsoluteTurnPosition()}, 
-        this.getReducedAngle(), factor);
+        this.getReducedAngle(), driveFactor);
     }
 
     public void set(double[] driveSets, double[] turnSets) {
@@ -129,7 +129,7 @@ public class SwerveMaster {
     }
 
     //Does the heavy lifting
-    public void teleopUpdate(double[] inputs, double[] velocities, double[] positions, double reducedAngle, double factor) {
+    public void teleopUpdate(double[] inputs, double[] velocities, double[] positions, double reducedAngle, double driveFactor) {
         //NEW
         SmartDashboard.putNumber("Yaw: ", accelerometer.getYaw());
         SmartDashboard.putNumber("Reduced Yaw: ", reducedAngle);
@@ -173,6 +173,15 @@ public class SwerveMaster {
         if(inputs[0] == 0 && inputs[1] == 0 && inputs[2] == 0) {
             set(driveSets, turnSets);
             return;
+        }
+
+        //Offset angle to counteract drift. Go to method for more info.
+        if (inputs[2] != 0 && (inputs[0] != 0 || inputs[1] != 0)) {
+            inputs = offsetInput(inputs);
+
+            //Recalculate inputs using factor
+            inputs[0] *= driveFactor;
+            inputs[1] *= driveFactor;
         }
 
         //For ease of access
@@ -248,7 +257,7 @@ public class SwerveMaster {
             desiredMagnitude[i] = Math.sqrt(Math.pow(tempX, 2) + Math.pow(tempY, 2));
 
             if (desiredMagnitude[i] > Constants.maxTranslationalSpeed) {
-                desiredMagnitude[i] = (Constants.maxTranslationalSpeed / desiredMagnitude[i]) * desiredMagnitude[i];
+                desiredMagnitude[i] = Constants.maxTranslationalSpeed;
             }
 
             //Oh yeah forgot to mention I added optimisation while I was at it
@@ -281,8 +290,8 @@ public class SwerveMaster {
             
             //Kevin - Reduce this temp thing down to controller factor
             double temp = (Math.min(1, Math.abs(inputs[2]) + Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2))));
-            if (temp > factor) {
-                temp = factor;
+            if (temp > driveFactor) {
+                temp = driveFactor;
             }
             //Kevin - Divided desired magnitude by max speed
             driveSets[i] = driveSetInvert * -desiredMagnitude[i] / Constants.maxTranslationalSpeed * temp;
@@ -301,5 +310,44 @@ public class SwerveMaster {
         }
 
         set(driveSets, turnSets);
+    }
+
+    //This method is meant to counteract the drift from swerve drive while
+    // turning and moving at the same time. This is accomplished by offsetting
+    // the left axis input in relation to the right axis input.
+    public double[] offsetInput(double[] inputs) {
+        //Calculate the angle of the left axis
+        double leftAngle = Math.atan2(-inputs[0], -inputs[1]) + Math.PI * 2;
+        
+        //Making sure range is 0 to 2pi
+        if(leftAngle > Math.PI * 2) {
+            leftAngle -= Math.PI * 2;
+        }
+
+        //Converting to degrees (0 to 360)
+        leftAngle *= 180 / Math.PI;
+
+        //ADD 90?!!??!
+        leftAngle += 90;
+
+        //Increase or decrease angle in proportion to right input X.
+        leftAngle += inputs[2] * 45; //Adjust angle until no drift.
+    
+        //Check for wrapping 
+        if (leftAngle >= 360) {
+            leftAngle -= 360;
+        } else if (leftAngle < 0) {
+            leftAngle += 360;
+        }
+
+        //Reconvert back to radians. 
+        leftAngle *= Math.PI / 180;
+
+        //Get new inputs from the adjusted angle
+        inputs[0] = Math.cos(leftAngle);
+        inputs[1] = -1 * Math.sin(leftAngle);
+        
+        //Return inputs
+        return inputs;
     }
 }

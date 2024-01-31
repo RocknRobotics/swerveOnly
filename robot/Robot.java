@@ -14,6 +14,8 @@ public class Robot extends TimedRobot {
   private PS4Controller driveController;
   //The current factor to multiply driveController inputs by -> 0, 0.25, 0.5, 0.75, or 1 (basically different speed levels)
   public static double driveControllerFactor;
+  //Turn factor
+  public static double turnFactor;
   //Self-explanatory
   private SwerveMaster mySwerveMaster;
   
@@ -23,6 +25,7 @@ public class Robot extends TimedRobot {
 
     driveController = new PS4Controller(Constants.driveControllerPort);
     driveControllerFactor = 0.2d;
+    turnFactor = 0.5;
     mySwerveMaster = new SwerveMaster();
 
     mySwerveMaster.leftUpModule.driveMotor.setIdleMode(CANSparkBase.IdleMode.kBrake);
@@ -58,15 +61,15 @@ public class Robot extends TimedRobot {
     if(driveController.getTouchpadPressed()) {
       driveControllerFactor = 0d;
     } else if(driveController.getShareButtonPressed()) {
-      driveControllerFactor = 0.1d;
-    } else if(driveController.getSquareButtonPressed()) {
       driveControllerFactor = 0.2d;
-    } else if(driveController.getCrossButtonPressed()) {
-      driveControllerFactor = 0.3d;
-    } else if(driveController.getCircleButtonPressed()) {
+    } else if(driveController.getSquareButtonPressed()) {
       driveControllerFactor = 0.4d;
+    } else if(driveController.getCrossButtonPressed()) {
+      driveControllerFactor = 0.6d;
+    } else if(driveController.getCircleButtonPressed()) {
+      driveControllerFactor = 0.8d;
     } else if(driveController.getTriangleButtonPressed()) {
-      driveControllerFactor = 0.5d;
+      driveControllerFactor = 1.0d;
     }
 
     //NEW, since accelerometer will need to be reset due to inaccuracies accumulating
@@ -79,7 +82,7 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("DC Left Y: ", driveController.getLeftY());
     SmartDashboard.putNumber("DC Right X: ", driveController.getRightX());
 
-    mySwerveMaster.update(driveController, driveControllerFactor);
+    mySwerveMaster.update(driveController, driveControllerFactor, turnFactor);
   }
 
   @Override
