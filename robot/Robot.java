@@ -25,7 +25,7 @@ public class Robot extends TimedRobot {
 
     driveController = new PS4Controller(Constants.driveControllerPort);
     driveControllerFactor = 0.2d;
-    turnFactor = 0.5;
+    turnFactor = 0.2d;
     mySwerveMaster = new SwerveMaster();
 
     mySwerveMaster.leftUpModule.driveMotor.setIdleMode(CANSparkBase.IdleMode.kBrake);
@@ -60,16 +60,22 @@ public class Robot extends TimedRobot {
 
     if(driveController.getTouchpadPressed()) {
       driveControllerFactor = 0d;
+      turnFactor = 0d;
     } else if(driveController.getShareButtonPressed()) {
       driveControllerFactor = 0.2d;
+      turnFactor = 0.2d;
     } else if(driveController.getSquareButtonPressed()) {
       driveControllerFactor = 0.4d;
+      turnFactor = 0.2d;
     } else if(driveController.getCrossButtonPressed()) {
       driveControllerFactor = 0.6d;
+      turnFactor = 0.2d;
     } else if(driveController.getCircleButtonPressed()) {
       driveControllerFactor = 0.8d;
+      turnFactor = 0.2d;
     } else if(driveController.getTriangleButtonPressed()) {
       driveControllerFactor = 1.0d;
+      turnFactor = 0.2d;
     }
 
     //NEW, since accelerometer will need to be reset due to inaccuracies accumulating
@@ -82,13 +88,13 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("DC Left Y: ", driveController.getLeftY());
     SmartDashboard.putNumber("DC Right X: ", driveController.getRightX());
 
-    mySwerveMaster.update(driveController, driveControllerFactor, turnFactor);
+    mySwerveMaster.update(driveController, driveControllerFactor, driveControllerFactor);
   }
 
   @Override
   public void disabledInit() {
     SmartDashboard.putString("Mode: ", "disabledInit");
-    mySwerveMaster.set(new double[]{0d, 0d, 0d, 0d}, new double[]{0d, 0d, 0d, 0d});
+    mySwerveMaster.disable();
   }
 
   @Override

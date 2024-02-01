@@ -74,7 +74,7 @@ public class SwerveMaster {
 
     public void update(PS4Controller controller, double driveFactor, double turnFactor) {
         if(driveFactor == 0) {
-            this.set(new double[]{0, 0, 0, 0}, new double[]{0, 0, 0, 0});
+            this.disable();
             return;
         }
 
@@ -88,10 +88,17 @@ public class SwerveMaster {
     }
 
     public void set(double[] driveSets, double[] turnSets) {
-        leftUpModule.set(driveSets[0], turnSets[0]);
-        leftDownModule.set(driveSets[1], turnSets[1]);
-        rightUpModule.set(driveSets[2], turnSets[2]);
-        rightDownModule.set(driveSets[3], turnSets[3]);
+        leftUpModule.set(driveSets[0], turnSets[0], 0);
+        leftDownModule.set(driveSets[1], turnSets[1], 1);
+        rightUpModule.set(driveSets[2], turnSets[2], 2);
+        rightDownModule.set(driveSets[3], turnSets[3], 3);
+    }
+    
+    public void disable() {
+        leftUpModule.disable();
+        leftDownModule.disable();
+        rightUpModule.disable();
+        rightDownModule.disable();
     }
 
     public void resetAccelerometer() {
@@ -207,11 +214,11 @@ public class SwerveMaster {
             //Calculating the translational magnitude as the proportion of the translational
             //inputs multiplied by the max speed... definitely not the right way to get the magnitude
             //since it doesn't take into account the actual input values---only the proportion
-            translationalMagnitude[i] = Constants.maxTranslationalSpeed * Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2)) / Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2) + Math.pow(inputs[2], 2));            //Above but for rotational. Since translational magnitude is in metres, I converted
+            translationalMagnitude[i] = Constants.maxTranslationalSpeed * Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2));// / Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2) + Math.pow(inputs[2], 2));            //Above but for rotational. Since translational magnitude is in metres, I converted
             //a max speed of 2pi to metres, which is equivalent to traveling the circumference
             //of the circle the wheels lie on, so thus I multiplied by the robot circumference
             //Again, not correct, but it at least worked
-            rotationalMagnitude[i] = Constants.motorConstants.driveConstants.leftToRightDistanceMetres * Math.PI * Math.abs(inputs[2]) / Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2) + Math.pow(inputs[2], 2));
+            rotationalMagnitude[i] = Constants.motorConstants.driveConstants.leftToRightDistanceMetres * Math.PI * Math.abs(inputs[2]);// / Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2) + Math.pow(inputs[2], 2));
             //Setting the rotational angle based on whether turning left/right
             //If no rotation, then the magnitude is zero, so it doesn't matter what the angle is
             if(inputs[2] < 0) {

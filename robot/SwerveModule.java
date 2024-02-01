@@ -24,6 +24,9 @@ public class SwerveModule {
 
     private int encoderInvert;
 
+    //Track Speed
+    double driveSpeed;
+
     public SwerveModule(int driveMotorID, int turnMotorID, int turnEncoderID, boolean driveMotorInvert, boolean turnMotorInvert, boolean encoderInvert, double offsetAngle) {
         driveMotor = new CANSparkMax(driveMotorID, MotorType.kBrushless);
         turnMotor = new CANSparkMax(turnMotorID, MotorType.kBrushless);
@@ -34,6 +37,7 @@ public class SwerveModule {
         driveMotor.setInverted(driveMotorInvert);
         turnMotor.setInverted(turnMotorInvert);
 
+        driveSpeed = 0;
         this.encoderInvert = encoderInvert ? -1 : 1;
     }
 
@@ -42,9 +46,29 @@ public class SwerveModule {
         return new SwerveModuleState(getDriveVelocity(), Rotation2d.fromDegrees(getAbsoluteTurnPosition()));
     }
 
-    public void set(double driveSet, double turnSet) {
+    public void set(double driveSet, double turnSet, int num) {
+        if (driveSpeed < driveSet) {
+            driveSpeed += 0.03;
+            if (driveSpeed > driveSet) {
+                driveSpeed = driveSet;
+            }
+        } else if (driveSpeed > driveSet) {
+            driveSpeed -= 0.03;
+            if (driveSpeed < driveSet) {
+                driveSpeed = driveSet;
+            }
+        }
+        /*if (driveSpeed != 0 && num == 0) {
+            System.out.println(driveSpeed + " - " + driveSet);
+        }*/
         driveMotor.set(driveSet);
         turnMotor.set(turnSet);
+    }
+
+    public void disable() {
+        driveSpeed = 0;
+        driveMotor.set(0);
+        turnMotor.set(0);
     }
 
     //Metres position of the drive talon
