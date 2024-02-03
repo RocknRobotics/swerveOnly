@@ -70,21 +70,32 @@ public class SwerveMaster {
         desiredX = 0d;
         desiredY = 0d;
         desiredHeading = 0d;
+
+        SmartDashboard.putNumber("Drift Constant", -2d);
     }
 
     public void update(PS4Controller controller, double driveFactor, double turnFactor) {
-        if(driveFactor == 0) {
+        if(driveFactor == 0 && turnFactor == 0) {
             this.set(new double[]{0, 0, 0, 0}, new double[]{0, 0, 0, 0});
             return;
         }
 
+        double[] inputs = new double[]{Math.abs(controller.getLeftX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftX(), 
+            Math.abs(controller.getLeftY()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftY(), 
+            Math.abs(controller.getRightX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getRightX()};
+        
+        inputs[0] *= driveFactor;
+        inputs[1] *= driveFactor;
+        inputs[2] *= turnFactor; 
+        /*if (!(inputs[0] == 0 && inputs[1] == 0)) {
+            inputs = this.offsetInput(inputs);
+        }*/
+
         //NEW, ternaries before calculating factor allows lower speeds when the drive factor is low
-        teleopUpdate(new double[]{Math.abs(controller.getLeftX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftX() * driveFactor, 
-            Math.abs(controller.getLeftY()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftY() * driveFactor, 
-            Math.abs(controller.getRightX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getRightX() * turnFactor}, 
+        teleopUpdate(inputs, 
         new double[]{leftUpModule.getDriveVelocity(), leftDownModule.getDriveVelocity(), rightUpModule.getDriveVelocity(), rightDownModule.getDriveVelocity()}, 
         new double[]{leftUpModule.getAbsoluteTurnPosition(), leftDownModule.getAbsoluteTurnPosition(), rightUpModule.getAbsoluteTurnPosition(), rightDownModule.getAbsoluteTurnPosition()}, 
-        this.getReducedAngle(), driveFactor);
+        this.getReducedAngle(), driveFactor, turnFactor);
     }
 
     public void set(double[] driveSets, double[] turnSets) {
@@ -129,7 +140,12 @@ public class SwerveMaster {
     }
 
     //Does the heavy lifting
-    public void teleopUpdate(double[] inputs, double[] velocities, double[] positions, double reducedAngle, double driveFactor) {
+    public void teleopUpdate(double[] inputs, double[] velocities, double[] positions, double reducedAngle, double driveFactor, double turnFactor) {
+        if(inputs[0] == 0 && inputs[1] == 0 && inputs[2] == 0) {
+            set(new double[]{0d, 0d, 0d, 0d}, new double[]{0d, 0d, 0d, 0d});
+            return;
+        }
+
         //NEW
         SmartDashboard.putNumber("Yaw: ", accelerometer.getYaw());
         SmartDashboard.putNumber("Reduced Yaw: ", reducedAngle);
@@ -155,9 +171,15 @@ public class SwerveMaster {
 
         //Convert inputs to desired values---doesn't apply translation/rotation limit yet
         //Doesn't seem right... why multiply by controllerFactor?
-        double desiredVx = -inputs[1] * Constants.maxTranslationalSpeed * Robot.driveControllerFactor;
-        double desiredVy = inputs[0] * Constants.maxTranslationalSpeed * Robot.driveControllerFactor;
-        double desiredOmega = -inputs[2] * Constants.maxAngularSpeed * Robot.driveControllerFactor;
+        double adjustedX = inputs[0] / (Math.abs(inputs[1]) + Math.abs(inputs[2]) + 1);
+        double adjustedY = -inputs[1] / (Math.abs(inputs[0]) + Math.abs(inputs[2]) + 1);
+        double adjustedOmega = inputs[2] / (Math.abs(inputs[1]) + Math.abs(inputs[0]) + 1);
+
+        SmartDashboard.putNumber("Adjusted X: ", adjustedX);
+        SmartDashboard.putNumber("Adjusted Y: ", adjustedY);
+        SmartDashboard.putNumber("Adjusted Omega: ", adjustedOmega);
+        
+
         //The desired global translational vector of each wheel as described by angle and magnitude
         double[] translationalAngles = new double[4];
         double[] translationalMagnitude = new double[4];
@@ -168,24 +190,6 @@ public class SwerveMaster {
         double[] desiredAngle = new double[4];
         double[] desiredMagnitude = new double[4];
 
-        //Necessary since when converting inputs to proportions, division by 0 occurs if all inputs are 0
-        //Then the result will be NaN, causing undefined behaviour
-        if(inputs[0] == 0 && inputs[1] == 0 && inputs[2] == 0) {
-            set(driveSets, turnSets);
-            return;
-        }
-
-        //Offset angle to counteract drift. Go to method for more info.
-        if (inputs[2] != 0 && (inputs[0] != 0 || inputs[1] != 0)) {
-            inputs = offsetInput(inputs);
-
-            //Recalculate inputs using factor
-            inputs[0] *= driveFactor;
-            inputs[1] *= driveFactor;
-        }
-
-        //For ease of access
-        SwerveModule[] moduleList = new SwerveModule[]{leftUpModule, leftDownModule, rightUpModule, rightDownModule};
         //The list of the desired relative angle of each motor if turning right
         double[] angleListOne = new double[]{135d, 225d, 45d, 315d};
         //Turning left
@@ -193,10 +197,14 @@ public class SwerveMaster {
 
         for(int i = 0; i < 4; i++) {
             //Calculating the angle of the global desired angle of the translational vector
-            translationalAngles[i] = Math.atan2(-inputs[0], -inputs[1]) + Math.PI * 2;
+            translationalAngles[i] = Math.atan2(adjustedY, adjustedX) + Math.PI * 2 - Math.PI / 2;
+            translationalAngles[i] -= (1d / (0.75 + turnFactor)) * (0.75 + driveFactor) * adjustedOmega * SmartDashboard.getNumber("Drift Constant", -2d);
             //Making sure range is 0 to 2pi
-            if(translationalAngles[i] > Math.PI * 2) {
+            while(translationalAngles[i] > Math.PI * 2) {
                 translationalAngles[i] -= Math.PI * 2;
+            }
+            while(translationalAngles[i] <= 0) {
+                translationalAngles[i] += Math.PI * 2;
             }
             //Converting to degrees (0 to 360)
             translationalAngles[i] *= 180 / Math.PI;
@@ -207,14 +215,15 @@ public class SwerveMaster {
             //Calculating the translational magnitude as the proportion of the translational
             //inputs multiplied by the max speed... definitely not the right way to get the magnitude
             //since it doesn't take into account the actual input values---only the proportion
-            translationalMagnitude[i] = Constants.maxTranslationalSpeed * Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2)) / Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2) + Math.pow(inputs[2], 2));            //Above but for rotational. Since translational magnitude is in metres, I converted
+            translationalMagnitude[i] = Math.sqrt(Math.pow(adjustedX, 2) + Math.pow(adjustedY, 2));
+            //Above but for rotational. Since translational magnitude is in metres, I converted
             //a max speed of 2pi to metres, which is equivalent to traveling the circumference
             //of the circle the wheels lie on, so thus I multiplied by the robot circumference
             //Again, not correct, but it at least worked
-            rotationalMagnitude[i] = Constants.motorConstants.driveConstants.leftToRightDistanceMetres * Math.PI * Math.abs(inputs[2]) / Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2) + Math.pow(inputs[2], 2));
+            rotationalMagnitude[i] = Math.abs(adjustedOmega);
             //Setting the rotational angle based on whether turning left/right
             //If no rotation, then the magnitude is zero, so it doesn't matter what the angle is
-            if(inputs[2] < 0) {
+            if(adjustedOmega < 0) {
                 rotationalAngles[i] = angleListOne[i];
             } else {
                 rotationalAngles[i] = angleListTwo[i];
@@ -232,10 +241,10 @@ public class SwerveMaster {
             //Wtf that just doesn't seem right at all
             //Isn't x/y being 0 possible if the angle between the two vectors results in 0/90/180/etc?
             //Also I think atan2 handles 0s anyways?
-            if(inputs[0] == 0 && inputs[1] == 0) {
+            if(adjustedX == 0 && adjustedY == 0) {
                 tempX = rotationalMagnitude[i] * Math.cos(rotationalAngles[i] * Math.PI / 180);
                 tempY = rotationalMagnitude[i] * Math.sin(rotationalAngles[i] * Math.PI / 180);
-            } else if(inputs[2] == 0) {
+            } else if(adjustedOmega == 0) {
                 tempX = translationalMagnitude[i] * Math.cos(translationalAngles[i] * Math.PI / 180);
                 tempY = translationalMagnitude[i] * Math.sin(translationalAngles[i] * Math.PI / 180);
             }
@@ -253,12 +262,9 @@ public class SwerveMaster {
             if(desiredAngle[i] <= 0) {
                 desiredAngle[i] += 360;
             }
+
             //Getting the magnitude via the pythagorean theorem
             desiredMagnitude[i] = Math.sqrt(Math.pow(tempX, 2) + Math.pow(tempY, 2));
-
-            if (desiredMagnitude[i] > Constants.maxTranslationalSpeed) {
-                desiredMagnitude[i] = Constants.maxTranslationalSpeed;
-            }
 
             //Oh yeah forgot to mention I added optimisation while I was at it
             int driveSetInvert = 1;
@@ -288,13 +294,8 @@ public class SwerveMaster {
             //As a temporary fix, I've made the controller factor range 0 to 0.5
             //Please actually make the driveSet stuff correct so the controller range can be 0 to 1 again
             
-            //Kevin - Reduce this temp thing down to controller factor
-            double temp = (Math.min(1, Math.abs(inputs[2]) + Math.sqrt(Math.pow(inputs[0], 2) + Math.pow(inputs[1], 2))));
-            if (temp > driveFactor) {
-                temp = driveFactor;
-            }
             //Kevin - Divided desired magnitude by max speed
-            driveSets[i] = driveSetInvert * -desiredMagnitude[i] / Constants.maxTranslationalSpeed * temp;
+            driveSets[i] = driveSetInvert * -desiredMagnitude[i];
     
             //Debugging purposes
             SmartDashboard.putNumber("Trans Ang " + i + ": ", translationalAngles[i]);
@@ -310,6 +311,7 @@ public class SwerveMaster {
         }
 
         set(driveSets, turnSets);
+        //set(new double[]{0d, 0d, 0d, 0d}, new double[]{0d, 0d, 0d, 0d});
     }
 
     //This method is meant to counteract the drift from swerve drive while
@@ -344,8 +346,8 @@ public class SwerveMaster {
         leftAngle *= Math.PI / 180;
 
         //Get new inputs from the adjusted angle
-        inputs[0] = Math.cos(leftAngle);
-        inputs[1] = -1 * Math.sin(leftAngle);
+        inputs[0] = Math.cos(leftAngle) * Math.abs(inputs[0]);
+        inputs[1] = -1 * Math.sin(leftAngle) * Math.abs(inputs[1]);
         
         //Return inputs
         return inputs;

@@ -24,8 +24,8 @@ public class Robot extends TimedRobot {
     SmartDashboard.putString("Current mode: ", "robotInit");
 
     driveController = new PS4Controller(Constants.driveControllerPort);
-    driveControllerFactor = 0.2d;
-    turnFactor = 0.5;
+    driveControllerFactor = 0.25d;
+    turnFactor = 0.25d;
     mySwerveMaster = new SwerveMaster();
 
     mySwerveMaster.leftUpModule.driveMotor.setIdleMode(CANSparkBase.IdleMode.kBrake);
@@ -60,16 +60,26 @@ public class Robot extends TimedRobot {
 
     if(driveController.getTouchpadPressed()) {
       driveControllerFactor = 0d;
-    } else if(driveController.getShareButtonPressed()) {
-      driveControllerFactor = 0.2d;
     } else if(driveController.getSquareButtonPressed()) {
-      driveControllerFactor = 0.4d;
+      driveControllerFactor = 0.25d;
     } else if(driveController.getCrossButtonPressed()) {
-      driveControllerFactor = 0.6d;
+      driveControllerFactor = 0.5d;
     } else if(driveController.getCircleButtonPressed()) {
-      driveControllerFactor = 0.8d;
+      driveControllerFactor = 0.75d;
     } else if(driveController.getTriangleButtonPressed()) {
       driveControllerFactor = 1.0d;
+    }
+
+    if(driveController.getPSButtonPressed()) {
+      turnFactor = 0d;
+    } else if(driveController.getPOV() == 270) {
+      turnFactor = 0.25d;
+    } else if(driveController.getPOV() == 180) {
+      turnFactor = 0.5d;
+    } else if(driveController.getPOV() == 90) {
+      turnFactor = 0.75d;
+    } else if(driveController.getPOV() == 0) {
+      turnFactor = 1.0d;
     }
 
     //NEW, since accelerometer will need to be reset due to inaccuracies accumulating
@@ -78,6 +88,7 @@ public class Robot extends TimedRobot {
     }
 
     SmartDashboard.putNumber("Drive Factor: ", driveControllerFactor);
+    SmartDashboard.putNumber("Turn Factor: ", turnFactor);
     SmartDashboard.putNumber("DC Left X: ", driveController.getLeftX());    
     SmartDashboard.putNumber("DC Left Y: ", driveController.getLeftY());
     SmartDashboard.putNumber("DC Right X: ", driveController.getRightX());
