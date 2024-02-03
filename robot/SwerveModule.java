@@ -24,15 +24,22 @@ public class SwerveModule {
 
     private int encoderInvert;
 
+    private double prevTime;
+    private double[] currPos;
+
     public SwerveModule(int driveMotorID, int turnMotorID, int turnEncoderID, boolean driveMotorInvert, boolean turnMotorInvert, boolean encoderInvert, double offsetAngle) {
         driveMotor = new CANSparkMax(driveMotorID, MotorType.kBrushless);
         turnMotor = new CANSparkMax(turnMotorID, MotorType.kBrushless);
         driveRelative = driveMotor.getEncoder();
+        driveRelative.setVelocityConversionFactor(1);
         turnEncoder = new AnalogEncoder(turnEncoderID);
 
         encoderOffset = offsetAngle;
         driveMotor.setInverted(driveMotorInvert);
         turnMotor.setInverted(turnMotorInvert);
+
+        prevTime = System.currentTimeMillis();
+        currPos = new double[2];
 
         this.encoderInvert = encoderInvert ? -1 : 1;
     }
@@ -52,7 +59,7 @@ public class SwerveModule {
         return driveRelative.getPosition() * driveConstants.metresPerRotation;
     }
 
-    //Radians position of the turn talon
+    //Degrees position of the turn talon
     public double getAbsoluteTurnPosition() {
         //SmartDashboard.putNumber("Raw Position " + Constants.counter + ": ", (turnEncoder.getAbsolutePosition() - encoderOffset));
         //NEW, degree calculations + removed the -180 (or pi) from the end
@@ -76,6 +83,53 @@ public class SwerveModule {
 
     //Metres/second velocity of the drive talon
     public double getDriveVelocity() {
-        return driveRelative.getVelocity() * driveConstants.metresPerRotation / 60.0d;
+        return driveRelative.getVelocity() * driveConstants.metresPerRotation / 60d;
+    }
+
+    //Set x and y position of the motor in meters. 
+    public void resetPosition(double x, double y) {
+        currPos[0] = x;
+        currPos[1] = y;
+    }
+
+    //Get field position of the motor relative to the start origin
+    public double[] getPosition(double reducedAngle) {
+        //Get the field relative angle that the wheel is pointing
+        double moveAngle = getAbsoluteTurnPosition() - reducedAngle;
+        while (moveAngle < 0) {
+            moveAngle += 360;
+        }
+
+        //Get how far the wheel moved in that direction
+        //Velocity is reversed to make x positive going right and y positive going forward
+        double currTime = System.currentTimeMillis();
+        double moveLength = -getDriveVelocity() * ((currTime - prevTime) / 1000d);
+
+        
+        /*SmartDashboard.putNumber("M0 Angle", moveAngle);
+        SmartDashboard.putNumber("M0 moveLength", moveLength);
+        SmartDashboard.putNumber("M0 velocity", getDriveVelocity());
+        SmartDashboard.putNumber("M0 rpm", driveRelative.getVelocity());
+        SmartDashboard.putNumber("M0 timeP", prevTime);
+        SmartDashboard.putNumber("M0 timeC", currTime);
+        SmartDashboard.putNumber("M0 timechange", (currTime - prevTime));
+        */
+
+        prevTime = currTime;
+
+        //Calculate how x and y are related using the angle
+        double factorY = Math.cos(moveAngle * Math.PI / 180);
+        double factorX = Math.sin(moveAngle * Math.PI / 180);
+
+        //Multiply factors by distance travelled to get x and y changes.
+        double deltaY = factorY * moveLength;
+        double deltaX = factorX * moveLength;
+
+        //Update currX and currY
+        currPos[0] += deltaX;
+        currPos[1] += deltaY;
+
+        //Return position
+        return currPos;
     }
 }

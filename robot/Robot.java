@@ -4,6 +4,8 @@ import com.revrobotics.CANSparkBase;
 
 import edu.wpi.first.hal.CANAPIJNI;
 import edu.wpi.first.hal.can.CANJNI;
+import edu.wpi.first.wpilibj.DigitalInput;
+import edu.wpi.first.wpilibj.DutyCycleEncoder;
 import edu.wpi.first.wpilibj.PS4Controller;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -18,6 +20,7 @@ public class Robot extends TimedRobot {
   public static double turnFactor;
   //Self-explanatory
   private SwerveMaster mySwerveMaster;
+  private DutyCycleEncoder testDutyCycleEncoder;
   
   @Override
   public void robotInit() {
@@ -33,6 +36,8 @@ public class Robot extends TimedRobot {
     mySwerveMaster.rightUpModule.driveMotor.setIdleMode(CANSparkBase.IdleMode.kBrake);
     mySwerveMaster.rightDownModule.driveMotor.setIdleMode(CANSparkBase.IdleMode.kBrake);
     mySwerveMaster.resetAccelerometer();
+
+    testDutyCycleEncoder = new DutyCycleEncoder(0);
 
     SmartDashboard.putNumber("kP: ", 0.8);
     SmartDashboard.putNumber("kI: ", 0.0);
@@ -82,6 +87,10 @@ public class Robot extends TimedRobot {
       turnFactor = 1.0d;
     }
 
+    if (driveController.getShareButtonPressed()) {
+      mySwerveMaster.resetOrigin();
+    }
+
     //NEW, since accelerometer will need to be reset due to inaccuracies accumulating
     if(driveController.getOptionsButtonPressed()) {
       mySwerveMaster.resetAccelerometer();
@@ -109,5 +118,8 @@ public class Robot extends TimedRobot {
   public void testInit() {}
 
   @Override
-  public void testPeriodic() {}
+  public void testPeriodic() {
+    SmartDashboard.putBoolean("DIO Encoder Connected: ", testDutyCycleEncoder.isConnected());
+    SmartDashboard.putNumber("DIO Encoder: ", testDutyCycleEncoder.getAbsolutePosition());
+  }
 }

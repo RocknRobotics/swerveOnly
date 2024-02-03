@@ -28,15 +28,10 @@ public class SwerveMaster {
     //Enables continious input I think? I'm writing this using another person's code as a guide---I'll mess around with changing
     //this once we have the swerve drive built
     private PIDController turnPIDController;
-    private PIDController turnSetController;
 
-    private double currentX;
-    private double currentY;
-    private double currentHeading;
+    //Odometry
+    private double[] robotPosition;
 
-    private double desiredX;
-    private double desiredY;
-    private double desiredHeading;
 
     public SwerveMaster() {
         leftUpModule = new SwerveModule(driveConstants.leftUpID, turnConstants.leftUpID, turnConstants.leftUpEncoderID, driveConstants.leftUpInvert, 
@@ -48,6 +43,11 @@ public class SwerveMaster {
         rightDownModule = new SwerveModule(driveConstants.rightDownID, turnConstants.rightDownID, turnConstants.rightDownEncoderID, driveConstants.rightDownInvert, 
         turnConstants.rightDownInvert, turnConstants.rightDownEncoderInvert, turnConstants.rightDownOffset);
 
+        leftUpModule.resetPosition(-0.3425d, 0.3425d);
+        leftDownModule.resetPosition(-0.3425d, -0.3425d);
+        rightUpModule.resetPosition(0.3425d, 0.3425d);
+        rightDownModule.resetPosition(0.3425d, -0.3425d);
+
         accelerometer = new AHRS(Port.kMXP, Constants.accelerometerUpdateFrequency);
         accelerometer.reset();
 
@@ -55,21 +55,7 @@ public class SwerveMaster {
         //NEW, changed max/min input and changed kp to 0.8 (it's what worked when testing---probably don't change it for now)
         turnPIDController.enableContinuousInput(0, 360);
 
-        //Ideally, this is the actual x/y/heading of the robot, as calculated from wheel/motor kinematics stuff
-        currentX = 0d;
-        currentY = 0d;
-        currentHeading = 0d;
-
-        //Somehow, this needs to be the desired x/y/heading of the robot as determined from the controller
-        //Hard part is taking into account friction and stuff?
-        //Overall, the goal of this was to prevent the case where moving it back and forth causes it to turn slightly
-        //(sometimes majorly). Worse though, is driving and turning causes drift in the direction of the turn.
-        //I don't care how the fix to this is implemented, literally whatever you think will work, go for it
-        //A small amount of error of x/y and heading is expected to accumulate over time due to discrepancies between wheel kinematics and reality as well as error accumulation on the gyro itself,
-        //what I want fixed is the rapid accumulation caused by driving/turning and the slight turning caused during translational movement
-        desiredX = 0d;
-        desiredY = 0d;
-        desiredHeading = 0d;
+        robotPosition = new double[2];
 
         SmartDashboard.putNumber("Drift Constant", -2d);
     }
@@ -107,14 +93,6 @@ public class SwerveMaster {
 
     public void resetAccelerometer() {
         accelerometer.reset();
-
-        currentX = 0d;
-        currentY = 0d;
-        currentHeading = 0d;
-
-        desiredX = 0d;
-        desiredY = 0d;
-        desiredHeading = 0d;
     }
 
     public boolean accelerometerIsCalibrating() {
@@ -310,46 +288,54 @@ public class SwerveMaster {
             SmartDashboard.putNumber("Drive Set " + i + ": ", driveSets[i]);
         }
 
+        updateRobotPosition(reducedAngle);
+        SmartDashboard.putNumber("Robot X", robotPosition[0]);
+        SmartDashboard.putNumber("Robot Y", robotPosition[1]);
+
         set(driveSets, turnSets);
         //set(new double[]{0d, 0d, 0d, 0d}, new double[]{0d, 0d, 0d, 0d});
     }
 
-    //This method is meant to counteract the drift from swerve drive while
-    // turning and moving at the same time. This is accomplished by offsetting
-    // the left axis input in relation to the right axis input.
-    public double[] offsetInput(double[] inputs) {
-        //Calculate the angle of the left axis
-        double leftAngle = Math.atan2(-inputs[0], -inputs[1]) + Math.PI * 2;
-        
-        //Making sure range is 0 to 2pi
-        if(leftAngle > Math.PI * 2) {
-            leftAngle -= Math.PI * 2;
-        }
+    public void resetOrigin() {
+        resetRobotPosition(0, 0);
+        leftUpModule.resetPosition(-0.3425d, 0.3425d);
+        leftDownModule.resetPosition(-0.3425d, -0.3425d);
+        rightUpModule.resetPosition(0.3425d, 0.3425d);
+        rightDownModule.resetPosition(0.3425d, -0.3425d);
+    }
 
-        //Converting to degrees (0 to 360)
-        leftAngle *= 180 / Math.PI;
+    //Odometry - Set robot position with x and y in meters from origin
+    public void resetRobotPosition(double x, double y) {
+        robotPosition[0] = x;
+        robotPosition[1] = y;
+    }
 
-        //ADD 90?!!??!
-        leftAngle += 90;
+    //Odometry - Get the robots position x and y in meters relative to origin
+    public double[] getRobotPosition() {
+        return robotPosition;
+    }
 
-        //Increase or decrease angle in proportion to right input X.
-        leftAngle += inputs[2] * 45; //Adjust angle until no drift.
-    
-        //Check for wrapping 
-        if (leftAngle >= 360) {
-            leftAngle -= 360;
-        } else if (leftAngle < 0) {
-            leftAngle += 360;
-        }
+    //Odometry - Update robot position. 
+    //Should be called as often as possible for less error
+    public void updateRobotPosition(double reducedAngle) {
+        double[] leftUpPos = leftUpModule.getPosition(reducedAngle);
+        double[] leftDownPos = leftDownModule.getPosition(reducedAngle);
+        double[] rightUpPos = rightUpModule.getPosition(reducedAngle);
+        double[] rightDownPos = rightDownModule.getPosition(reducedAngle);
 
-        //Reconvert back to radians. 
-        leftAngle *= Math.PI / 180;
+        //Calculate 2 centers of robot using mid-point formula
+        double[] center1 = {(leftUpPos[0] + rightDownPos[0]) / 2, (leftUpPos[1] + rightDownPos[1]) / 2};
+        double[] center2 = {(leftDownPos[0] + rightUpPos[0]) / 2, (leftDownPos[1] + rightUpPos[1]) / 2};
 
-        //Get new inputs from the adjusted angle
-        inputs[0] = Math.cos(leftAngle) * Math.abs(inputs[0]);
-        inputs[1] = -1 * Math.sin(leftAngle) * Math.abs(inputs[1]);
-        
-        //Return inputs
-        return inputs;
+        //Calculate mid-point of the two centers to get "true center" (supposedly)
+        robotPosition[0] = (center1[0] + center2[0]) / 2;
+        robotPosition[1] = (center1[1] + center2[1]) / 2;
+
+        //TODO - Reset position of wheels with new center
+        //Have to account for which direction the robot is facing
+        /*leftUpModule.resetPosition(-0.3425d, 0.3425d);
+        leftDownModule.resetPosition(-0.3425d, -0.3425d);
+        rightUpModule.resetPosition(0.3425d, 0.3425d);
+        rightDownModule.resetPosition(0.3425d, -0.3425d);*/
     }
 }
