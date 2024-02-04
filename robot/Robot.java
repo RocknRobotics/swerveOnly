@@ -1,49 +1,43 @@
 package frc.robot;
 
 import com.revrobotics.CANSparkBase;
-
-import edu.wpi.first.hal.CANAPIJNI;
-import edu.wpi.first.hal.can.CANJNI;
-import edu.wpi.first.wpilibj.DigitalInput;
-import edu.wpi.first.wpilibj.DutyCycleEncoder;
 import edu.wpi.first.wpilibj.PS4Controller;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import frc.robot.Constants.motorConstants.turnConstants;
 
 public class Robot extends TimedRobot {
   //The PS4Controller for driving
   private PS4Controller driveController;
+
   //The current factor to multiply driveController inputs by -> 0, 0.25, 0.5, 0.75, or 1 (basically different speed levels)
   public static double driveControllerFactor;
+
   //Turn factor
   public static double turnFactor;
+
   //Self-explanatory
   private SwerveMaster mySwerveMaster;
-  private DutyCycleEncoder testDutyCycleEncoder;
   
   @Override
   public void robotInit() {
     SmartDashboard.putString("Current mode: ", "robotInit");
 
+    //Controller variables
     driveController = new PS4Controller(Constants.driveControllerPort);
     driveControllerFactor = 0.25d;
     turnFactor = 0.25d;
+
+    //Create SwerveMaster object
     mySwerveMaster = new SwerveMaster();
 
+    //Set mode to brake
     mySwerveMaster.leftUpModule.driveMotor.setIdleMode(CANSparkBase.IdleMode.kBrake);
     mySwerveMaster.leftDownModule.driveMotor.setIdleMode(CANSparkBase.IdleMode.kBrake);
     mySwerveMaster.rightUpModule.driveMotor.setIdleMode(CANSparkBase.IdleMode.kBrake);
     mySwerveMaster.rightDownModule.driveMotor.setIdleMode(CANSparkBase.IdleMode.kBrake);
+
+    //Reset accelerometer on startup
     mySwerveMaster.resetAccelerometer();
-
-    testDutyCycleEncoder = new DutyCycleEncoder(0);
-
-    SmartDashboard.putNumber("kP: ", 0.8);
-    SmartDashboard.putNumber("kI: ", 0.0);
-    SmartDashboard.putNumber("kD: ", 0.0);
-    SmartDashboard.putNumber("Poition Tolerance: ", 0.1);
-    SmartDashboard.putNumber("Velocity Tolerance: ", 0.01);
   }
 
   //Every 20ms
@@ -87,27 +81,32 @@ public class Robot extends TimedRobot {
       turnFactor = 1.0d;
     }
 
+    //Odometry - Resets the origin and angle to the current position and angle of the robot
     if (driveController.getShareButtonPressed()) {
       mySwerveMaster.resetOrigin();
     }
 
-    //NEW, since accelerometer will need to be reset due to inaccuracies accumulating
+    //Accelerometer will need to be reset due to inaccuracies accumulating
     if(driveController.getOptionsButtonPressed()) {
       mySwerveMaster.resetAccelerometer();
     }
 
+    //Controller Smart Dashboard values
     SmartDashboard.putNumber("Drive Factor: ", driveControllerFactor);
     SmartDashboard.putNumber("Turn Factor: ", turnFactor);
     SmartDashboard.putNumber("DC Left X: ", driveController.getLeftX());    
     SmartDashboard.putNumber("DC Left Y: ", driveController.getLeftY());
     SmartDashboard.putNumber("DC Right X: ", driveController.getRightX());
 
+    //Call main method for swerve drive
     mySwerveMaster.update(driveController, driveControllerFactor, turnFactor);
   }
 
   @Override
   public void disabledInit() {
     SmartDashboard.putString("Mode: ", "disabledInit");
+
+    //Tell motors to stop
     mySwerveMaster.set(new double[]{0d, 0d, 0d, 0d}, new double[]{0d, 0d, 0d, 0d});
   }
 
@@ -118,8 +117,5 @@ public class Robot extends TimedRobot {
   public void testInit() {}
 
   @Override
-  public void testPeriodic() {
-    SmartDashboard.putBoolean("DIO Encoder Connected: ", testDutyCycleEncoder.isConnected());
-    SmartDashboard.putNumber("DIO Encoder: ", testDutyCycleEncoder.getAbsolutePosition());
-  }
+  public void testPeriodic() {}
 }

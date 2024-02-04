@@ -5,35 +5,30 @@ import frc.robot.Constants.motorConstants.*;
 import com.kauailabs.navx.frc.AHRS;
 
 import edu.wpi.first.math.controller.PIDController;
-import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.kinematics.ChassisSpeeds;
-import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
-import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
-import edu.wpi.first.math.kinematics.SwerveModulePosition;
-import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj.I2C.Port;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.PS4Controller;
-import edu.wpi.first.wpilibj.Timer;
 
 public class SwerveMaster {
+    //Variables for each swerve module
     public SwerveModule leftUpModule;
     public SwerveModule leftDownModule;
     public SwerveModule rightUpModule;
     public SwerveModule rightDownModule;
 
+    //Accelerometer object
     public AHRS accelerometer;
 
-    //Enables continious input I think? I'm writing this using another person's code as a guide---I'll mess around with changing
-    //this once we have the swerve drive built
+    //Enables continious input
     private PIDController turnPIDController;
 
-    //Odometry
+    //Odometry - robot's position
     private double[] robotPosition;
 
-
+    //Constructor
     public SwerveMaster() {
+        //Create swerve module objects
         leftUpModule = new SwerveModule(driveConstants.leftUpID, turnConstants.leftUpID, turnConstants.leftUpEncoderID, driveConstants.leftUpInvert, 
         turnConstants.leftUpInvert, turnConstants.leftUpEncoderInvert, turnConstants.leftUpOffset);
         leftDownModule = new SwerveModule(driveConstants.leftDownID, turnConstants.leftDownID, turnConstants.leftDownEncoderID, driveConstants.leftDownInvert, 
@@ -43,23 +38,30 @@ public class SwerveMaster {
         rightDownModule = new SwerveModule(driveConstants.rightDownID, turnConstants.rightDownID, turnConstants.rightDownEncoderID, driveConstants.rightDownInvert, 
         turnConstants.rightDownInvert, turnConstants.rightDownEncoderInvert, turnConstants.rightDownOffset);
 
+        //Set their position in relation to the center of the robot
         leftUpModule.resetPosition(-0.3425d, 0.3425d);
         leftDownModule.resetPosition(-0.3425d, -0.3425d);
         rightUpModule.resetPosition(0.3425d, 0.3425d);
         rightDownModule.resetPosition(0.3425d, -0.3425d);
 
+        //Create accelerometer object
         accelerometer = new AHRS(Port.kMXP, Constants.accelerometerUpdateFrequency);
         accelerometer.reset();
 
+        //Create PID Controller object
         turnPIDController = new PIDController(Constants.motorConstants.turnConstants.kP, 0d, 0);
-        //NEW, changed max/min input and changed kp to 0.8 (it's what worked when testing---probably don't change it for now)
+
+        //Set PID values
         turnPIDController.enableContinuousInput(0, 360);
 
+        //Create robot position array as [x, y] starting as [0, 0]
         robotPosition = new double[2];
 
+        //Drift constant to counteract drift
         SmartDashboard.putNumber("Drift Constant", -2d);
     }
 
+    
     public void update(PS4Controller controller, double driveFactor, double turnFactor) {
         if(driveFactor == 0 && turnFactor == 0) {
             this.set(new double[]{0, 0, 0, 0}, new double[]{0, 0, 0, 0});
