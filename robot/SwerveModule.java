@@ -104,17 +104,6 @@ public class SwerveModule {
         //Velocity is reversed to make x positive going right and y positive going forward
         double currTime = System.currentTimeMillis();
         double moveLength = -getDriveVelocity() * ((currTime - prevTime) / 1000d);
-
-        
-        /*SmartDashboard.putNumber("M0 Angle", moveAngle);
-        SmartDashboard.putNumber("M0 moveLength", moveLength);
-        SmartDashboard.putNumber("M0 velocity", getDriveVelocity());
-        SmartDashboard.putNumber("M0 rpm", driveRelative.getVelocity());
-        SmartDashboard.putNumber("M0 timeP", prevTime);
-        SmartDashboard.putNumber("M0 timeC", currTime);
-        SmartDashboard.putNumber("M0 timechange", (currTime - prevTime));
-        */
-
         prevTime = currTime;
 
         //Calculate how x and y are related using the angle
@@ -131,5 +120,39 @@ public class SwerveModule {
 
         //Return position
         return currPos;
+    }
+
+    public double[] getModulePosition() {
+        return currPos;
+    }
+
+    //Realign the position of the wheels after figuring out the position of the center
+    public void alignPosition(double[] center, double reducedAngle, double[] initial) {
+        //Find out angle and distance from origin of initial
+        //Polar coordinates
+        double distance = Math.sqrt(Math.pow(initial[0], 2) + Math.pow(initial[1], 2));
+        double angle = Math.atan2(initial[1], initial[0]) + Math.PI * 2 - Math.PI / 2;
+
+        //Convert to degrees
+        angle *= 180 / Math.PI;
+
+        //Adjust angle 
+        angle += reducedAngle;
+
+        //Check for wrapping
+        while (angle >= 360) {
+            angle -= 360;
+        }
+
+        //Reconvert back to radians
+        angle *= Math.PI / 180;
+
+        //Reconvert back to cartesian coordinates
+        double adjustedX = -Math.sin(angle) * distance;
+        double adjustedY = Math.sin(angle) * distance;
+
+        //Add robot values and set the new positions
+        currPos[0] = center[0] + adjustedX;
+        currPos[1] = center[1] + adjustedY;
     }
 }

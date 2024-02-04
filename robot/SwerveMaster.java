@@ -291,13 +291,25 @@ public class SwerveMaster {
         updateRobotPosition(reducedAngle);
         SmartDashboard.putNumber("Robot X", robotPosition[0]);
         SmartDashboard.putNumber("Robot Y", robotPosition[1]);
+        SmartDashboard.putNumber("M0 X", leftUpModule.getModulePosition()[0]);
+        SmartDashboard.putNumber("M0 Y", leftUpModule.getModulePosition()[1]);
+        SmartDashboard.putNumber("M1 X", leftDownModule.getModulePosition()[0]);
+        SmartDashboard.putNumber("M1 Y", leftDownModule.getModulePosition()[1]);
+        SmartDashboard.putNumber("M2 X", rightUpModule.getModulePosition()[0]);
+        SmartDashboard.putNumber("M2 Y", rightUpModule.getModulePosition()[1]);
+        SmartDashboard.putNumber("M3 X", rightDownModule.getModulePosition()[0]);
+        SmartDashboard.putNumber("M3 Y", rightDownModule.getModulePosition()[1]);
+
 
         set(driveSets, turnSets);
         //set(new double[]{0d, 0d, 0d, 0d}, new double[]{0d, 0d, 0d, 0d});
     }
 
+    //Odometry - Reset origin with new origin at center of robot
+    //Also needs gyro to be reset
     public void resetOrigin() {
         resetRobotPosition(0, 0);
+        resetAccelerometer();
         leftUpModule.resetPosition(-0.3425d, 0.3425d);
         leftDownModule.resetPosition(-0.3425d, -0.3425d);
         rightUpModule.resetPosition(0.3425d, 0.3425d);
@@ -308,6 +320,7 @@ public class SwerveMaster {
     public void resetRobotPosition(double x, double y) {
         robotPosition[0] = x;
         robotPosition[1] = y;
+        alignModules(getReducedAngle());
     }
 
     //Odometry - Get the robots position x and y in meters relative to origin
@@ -331,11 +344,16 @@ public class SwerveMaster {
         robotPosition[0] = (center1[0] + center2[0]) / 2;
         robotPosition[1] = (center1[1] + center2[1]) / 2;
 
-        //TODO - Reset position of wheels with new center
+        //Reset position of wheels with new center
         //Have to account for which direction the robot is facing
-        /*leftUpModule.resetPosition(-0.3425d, 0.3425d);
-        leftDownModule.resetPosition(-0.3425d, -0.3425d);
-        rightUpModule.resetPosition(0.3425d, 0.3425d);
-        rightDownModule.resetPosition(0.3425d, -0.3425d);*/
+        alignModules(reducedAngle);
+    }
+
+    //Odometry - Reset position of wheels with new center
+    public void alignModules(double reducedAngle) {
+        leftUpModule.alignPosition(robotPosition, reducedAngle, new double[]{-0.3425d, 0.3425d});
+        leftDownModule.alignPosition(robotPosition, reducedAngle, new double[]{-0.3425d, -0.3425d});
+        rightUpModule.alignPosition(robotPosition, reducedAngle, new double[]{0.3425d, 0.3425d});
+        rightDownModule.alignPosition(robotPosition, reducedAngle, new double[]{0.3425d, -0.3425d});
     }
 }
