@@ -49,6 +49,7 @@ public class SwerveModule {
         return new SwerveModuleState(getDriveVelocity(), Rotation2d.fromDegrees(getAbsoluteTurnPosition()));
     }
 
+    //Set drive and turn motors
     public void set(double driveSet, double turnSet) {
         driveMotor.set(driveSet);
         turnMotor.set(turnSet);
@@ -59,10 +60,8 @@ public class SwerveModule {
         return driveRelative.getPosition() * driveConstants.metresPerRotation;
     }
 
-    //Degrees position of the turn talon
+    // Degrees position of the turn talon
     public double getAbsoluteTurnPosition() {
-        //SmartDashboard.putNumber("Raw Position " + Constants.counter + ": ", (turnEncoder.getAbsolutePosition() - encoderOffset));
-        //NEW, degree calculations + removed the -180 (or pi) from the end
         double temp = 180 - encoderInvert * (turnEncoder.getAbsolutePosition() - encoderOffset) * turnConstants.degreesPerRotation;
 
         while(temp <= 0) {
@@ -71,12 +70,6 @@ public class SwerveModule {
         while(temp > 360) {
             temp -= 360;
         }
-
-        /*SmartDashboard.putNumber("Temp Position " + Constants.counter++ + ": ", temp);
-
-        if(Constants.counter == 4) {
-            Constants.counter = 0;
-        }*/
 
         return temp;
     }
@@ -122,6 +115,7 @@ public class SwerveModule {
         return currPos;
     }
 
+    //Returns position of module
     public double[] getModulePosition() {
         return currPos;
     }
