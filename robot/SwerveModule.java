@@ -7,8 +7,8 @@ import com.revrobotics.CANSparkLowLevel.MotorType;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj.AnalogEncoder;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Constants.motorConstants.*;
+//import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 //The class is used to represent a drive talon and turn talon that are part of one the swerve modules
 public class SwerveModule {

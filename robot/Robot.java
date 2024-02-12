@@ -81,14 +81,10 @@ public class Robot extends TimedRobot {
       turnFactor = 1.0d;
     }
 
-    //Odometry - Resets the origin and angle to the current position and angle of the robot
-    if (driveController.getShareButtonPressed()) {
-      mySwerveMaster.resetOrigin();
-    }
-
     //Accelerometer will need to be reset due to inaccuracies accumulating
-    if(driveController.getOptionsButtonPressed()) {
-      mySwerveMaster.resetAccelerometer();
+    //Odometry - Resets the origin and angle to the current position and angle of the robot
+    if (driveController.getOptionsButtonPressed()) {
+      mySwerveMaster.resetOrigin();
     }
 
     //Controller Smart Dashboard values

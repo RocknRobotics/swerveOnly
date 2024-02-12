@@ -61,31 +61,32 @@ public class SwerveMaster {
         SmartDashboard.putNumber("Drift Constant", -2d);
     }
 
-    
+    //Method called every 20ms 
     public void update(PS4Controller controller, double driveFactor, double turnFactor) {
+        //If driveFactor and turnFactor are 0, do nothing and stop the motors
         if(driveFactor == 0 && turnFactor == 0) {
             this.set(new double[]{0, 0, 0, 0}, new double[]{0, 0, 0, 0});
             return;
         }
 
+        //Puts X an Y axis inputs of controller in an array as [leftX, leftY, rightX]
         double[] inputs = new double[]{Math.abs(controller.getLeftX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftX(), 
             Math.abs(controller.getLeftY()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getLeftY(), 
             Math.abs(controller.getRightX()) < Constants.driveControllerStopBelowThis ? 0.0 : controller.getRightX()};
         
+        //Apply drive factor
         inputs[0] *= driveFactor;
         inputs[1] *= driveFactor;
         inputs[2] *= turnFactor; 
-        /*if (!(inputs[0] == 0 && inputs[1] == 0)) {
-            inputs = this.offsetInput(inputs);
-        }*/
 
-        //NEW, ternaries before calculating factor allows lower speeds when the drive factor is low
+        //Call the main method for teleop
         teleopUpdate(inputs, 
         new double[]{leftUpModule.getDriveVelocity(), leftDownModule.getDriveVelocity(), rightUpModule.getDriveVelocity(), rightDownModule.getDriveVelocity()}, 
         new double[]{leftUpModule.getAbsoluteTurnPosition(), leftDownModule.getAbsoluteTurnPosition(), rightUpModule.getAbsoluteTurnPosition(), rightDownModule.getAbsoluteTurnPosition()}, 
         this.getReducedAngle(), driveFactor, turnFactor);
     }
 
+    //Sets motor speeds given the drive and turn motor speeds
     public void set(double[] driveSets, double[] turnSets) {
         leftUpModule.set(driveSets[0], turnSets[0]);
         leftDownModule.set(driveSets[1], turnSets[1]);
@@ -101,10 +102,12 @@ public class SwerveMaster {
         return accelerometer.isCalibrating();
     }
 
+    //Gets the angle the robot is facing from 0 - 360 degrees
     public double getReducedAngle() {
         //You've got to be joking the darn navx is cw positive when we need ccw positive readings
         double temp = -accelerometer.getAngle();
         
+        //Just making sure the range is 0 - 360
         while(temp <= 0) {
             temp += 360;
         }
@@ -119,14 +122,15 @@ public class SwerveMaster {
         return Rotation2d.fromDegrees(this.getReducedAngle());
     }
 
-    //Does the heavy lifting
+    //Main method for teleop driving
     public void teleopUpdate(double[] inputs, double[] velocities, double[] positions, double reducedAngle, double driveFactor, double turnFactor) {
+        //If inputs are 0, do nothing and turn off the motors
         if(inputs[0] == 0 && inputs[1] == 0 && inputs[2] == 0) {
             set(new double[]{0d, 0d, 0d, 0d}, new double[]{0d, 0d, 0d, 0d});
             return;
         }
 
-        //NEW
+        //Smart Dashboard stuff to track variables
         SmartDashboard.putNumber("Yaw: ", accelerometer.getYaw());
         SmartDashboard.putNumber("Reduced Yaw: ", reducedAngle);
 
@@ -134,23 +138,12 @@ public class SwerveMaster {
         SmartDashboard.putNumber("Current 1 Angle: ", leftDownModule.getAbsoluteTurnPosition());
         SmartDashboard.putNumber("Current 2 Angle: ", rightUpModule.getAbsoluteTurnPosition());
         SmartDashboard.putNumber("Current 3 Angle: ", rightDownModule.getAbsoluteTurnPosition());
-
-        //NEW, deleted this for loop. Needs to be put back if you add an i component to the turnSetController (ensures integral doesn't accumulate forever)
         
-        //Arrays to be published later
+        //Create the arrays that will hold the drive and turn motor speeds
         double driveSets[] = new double[]{0d, 0d, 0d, 0d};
         double turnSets[] = new double[]{0d, 0d, 0d, 0d};
-        //Converts PS4 joystick inputs (field relative) into robot-relative speeds
-        //First is x m/s where fwd is positive
-        //Second is y m/s where left is positive
-        //Third is rad/s where counter clockwise is positive
-        //Fourth is robot angle
-        //Input[0] == left/right, input[1] == up/down, input[2] == left/right (turn)
-        //So first == input[1], second == -input[0], and third == -input[2]?
 
-
-        //Convert inputs to desired values---doesn't apply translation/rotation limit yet
-        //Doesn't seem right... why multiply by controllerFactor?
+        //Adjust inputs to account for drift while driving and turning
         double adjustedX = inputs[0] / (Math.abs(inputs[1]) + Math.abs(inputs[2]) + 1);
         double adjustedY = -inputs[1] / (Math.abs(inputs[0]) + Math.abs(inputs[2]) + 1);
         double adjustedOmega = inputs[2] / (Math.abs(inputs[1]) + Math.abs(inputs[0]) + 1);
@@ -175,10 +168,12 @@ public class SwerveMaster {
         //Turning left
         double[] angleListTwo = new double[]{315d, 45d, 225d, 135d};
 
+        //Iterate through each motor
         for(int i = 0; i < 4; i++) {
             //Calculating the angle of the global desired angle of the translational vector
             translationalAngles[i] = Math.atan2(adjustedY, adjustedX) + Math.PI * 2 - Math.PI / 2;
             translationalAngles[i] -= (1d / (0.75 + turnFactor)) * (0.75 + driveFactor) * adjustedOmega * SmartDashboard.getNumber("Drift Constant", -2d);
+
             //Making sure range is 0 to 2pi
             while(translationalAngles[i] > Math.PI * 2) {
                 translationalAngles[i] -= Math.PI * 2;
@@ -186,41 +181,37 @@ public class SwerveMaster {
             while(translationalAngles[i] <= 0) {
                 translationalAngles[i] += Math.PI * 2;
             }
+
             //Converting to degrees (0 to 360)
             translationalAngles[i] *= 180 / Math.PI;
-            //Subtracting the gyro angle to make the angle robot relative
+
+            //Subtracting the gyro angle to make the angle field relative
             //Don't need to check range since cos and sin functions don't care about that
-            //Does that mean the first range check isn't necessary?
             translationalAngles[i] -= reducedAngle;
-            //Calculating the translational magnitude as the proportion of the translational
-            //inputs multiplied by the max speed... definitely not the right way to get the magnitude
-            //since it doesn't take into account the actual input values---only the proportion
+
+            //Calculate the magnitude of the wheel's desired translation using Pythagorean Theorem
             translationalMagnitude[i] = Math.sqrt(Math.pow(adjustedX, 2) + Math.pow(adjustedY, 2));
-            //Above but for rotational. Since translational magnitude is in metres, I converted
-            //a max speed of 2pi to metres, which is equivalent to traveling the circumference
-            //of the circle the wheels lie on, so thus I multiplied by the robot circumference
-            //Again, not correct, but it at least worked
+
+            //Set the rotational magnitude to the adjustedOmega
             rotationalMagnitude[i] = Math.abs(adjustedOmega);
+
             //Setting the rotational angle based on whether turning left/right
             //If no rotation, then the magnitude is zero, so it doesn't matter what the angle is
             if(adjustedOmega < 0) {
-                rotationalAngles[i] = angleListOne[i];
+                rotationalAngles[i] = angleListOne[i]; //Right turn
             } else {
-                rotationalAngles[i] = angleListTwo[i];
+                rotationalAngles[i] = angleListTwo[i]; //Left turn
             }
 
             //Formula for converting from two vectors with a given magnitude and angle
-            //Into an x and y value. Guess I got lucky that the x and y weren't switched?
+            // into an x and y value
             double tempX = translationalMagnitude[i] * Math.cos(translationalAngles[i] * Math.PI / 180) 
                 + rotationalMagnitude[i] * Math.cos(rotationalAngles[i] * Math.PI / 180);
             double tempY = translationalMagnitude[i] * Math.sin(translationalAngles[i] * Math.PI / 180) 
                 + rotationalMagnitude[i] * Math.sin(rotationalAngles[i] * Math.PI / 180);
 
-            //Need to check if no translational or rotational input since that would make x/y 0 possibly,
-            //And then atan2 might have undefined behaviour?
-            //Wtf that just doesn't seem right at all
-            //Isn't x/y being 0 possible if the angle between the two vectors results in 0/90/180/etc?
-            //Also I think atan2 handles 0s anyways?
+            //Need to check if no translational or rotational input since that would make x/y 0,
+            // and then atan2 might have undefined behaviour
             if(adjustedX == 0 && adjustedY == 0) {
                 tempX = rotationalMagnitude[i] * Math.cos(rotationalAngles[i] * Math.PI / 180);
                 tempY = rotationalMagnitude[i] * Math.sin(rotationalAngles[i] * Math.PI / 180);
@@ -231,13 +222,13 @@ public class SwerveMaster {
 
             //Getting the relative desired angle of the vector for this wheel
             desiredAngle[i] = Math.atan2(tempX, tempY) * 180 / Math.PI;
+
             //Ensures it's in the right range for the purposes of setting the turn motor
             if(desiredAngle[i] <= 0) {
                 desiredAngle[i] += 360;
             }
-            //?
-            //I don't know why this is here
-            //Clearly necessary though since the robot drove correctly though
+
+            //Rotate right 90 degrees to align correctly
             desiredAngle[i] -= 90;
             if(desiredAngle[i] <= 0) {
                 desiredAngle[i] += 360;
@@ -246,36 +237,36 @@ public class SwerveMaster {
             //Getting the magnitude via the pythagorean theorem
             desiredMagnitude[i] = Math.sqrt(Math.pow(tempX, 2) + Math.pow(tempY, 2));
 
-            //Oh yeah forgot to mention I added optimisation while I was at it
+            //Optimization - invert drive of wheel rather than turn a full 180 degrees
             int driveSetInvert = 1;
 
             //turnPIDController takes into account the wrap from 0 to 360, so using it when calculating whether
-            //it's optimal to add/subtract 180 for reversing actually results in it at most turning 90 probably
-            //Not certain that 90 is the most it turns
-            //Also should probably divide by 90 then? (Or 180 if I was wrong in assuming 90 is the most it can turn)
+            // it's optimal to add/subtract 180 for reversing actually results in it at most turning 90 
             if(Math.abs(turnPIDController.calculate(positions[i], desiredAngle[i])) >= Math.abs(turnPIDController.calculate(positions[i], desiredAngle[i] + 180))) {
                 driveSetInvert = -1;
                 turnSets[i] = turnPIDController.calculate(positions[i], desiredAngle[i] + 180) / 360d;
+
+                if (Math.abs(turnPIDController.calculate(positions[i], desiredAngle[i] + 180)) > driveConstants.angleTolerance) {
+                    driveSetInvert = 0;
+                }
             } else if(Math.abs(turnPIDController.calculate(positions[i], desiredAngle[i])) >= Math.abs(turnPIDController.calculate(positions[i], desiredAngle[i] - 180))) {
                 driveSetInvert = -1;
                 turnSets[i] = turnPIDController.calculate(positions[i], desiredAngle[i] - 180) / 360d;
+
+                if (Math.abs(turnPIDController.calculate(positions[i], desiredAngle[i] - 180)) > driveConstants.angleTolerance) {
+                    driveSetInvert = 0;
+                }
             } else {
                 turnSets[i] = turnPIDController.calculate(positions[i], desiredAngle[i]) / 360d;
+
+                if (Math.abs(turnPIDController.calculate(positions[i], desiredAngle[i])) > driveConstants.angleTolerance) {
+                    driveSetInvert = 0;
+                }
             }
-
-            //So, if figured it's fine if the turnSets are always allowed to operate at max power, since the module will
-            //turn to a certain angle and then the motor turns off---it's not like driving is affected
-
-            //Drive though, needs to be variable based on motor inputs and the controller factor
-            //This attempts to convert all three inputs into a range from 0 to 1 (remember invert takes care
-            //of making it negative if needed).
-            //However, this does not work as desired, since anything above about a 0.5 controller factor results in the speed
-            //not changing since the motors are already going as fast as they can.
-            //As a temporary fix, I've made the controller factor range 0 to 0.5
-            //Please actually make the driveSet stuff correct so the controller range can be 0 to 1 again
-            
-            //Kevin - Divided desired magnitude by max speed
+            //Invert wheel if optimized
             driveSets[i] = driveSetInvert * -desiredMagnitude[i];
+            
+            
     
             //Debugging purposes
             SmartDashboard.putNumber("Trans Ang " + i + ": ", translationalAngles[i]);
@@ -290,7 +281,11 @@ public class SwerveMaster {
             SmartDashboard.putNumber("Drive Set " + i + ": ", driveSets[i]);
         }
 
+        //Odometry - Update the position of the robot using the angle the robot is facing
+        // and the velocity of the wheels
         updateRobotPosition(reducedAngle);
+
+        //Odometry - Checking positions of wheels and center of robot
         SmartDashboard.putNumber("Robot X", robotPosition[0]);
         SmartDashboard.putNumber("Robot Y", robotPosition[1]);
         SmartDashboard.putNumber("M0 X", leftUpModule.getModulePosition()[0]);
@@ -302,9 +297,11 @@ public class SwerveMaster {
         SmartDashboard.putNumber("M3 X", rightDownModule.getModulePosition()[0]);
         SmartDashboard.putNumber("M3 Y", rightDownModule.getModulePosition()[1]);
 
-
+        //Set the wheel speeds
         set(driveSets, turnSets);
-        //set(new double[]{0d, 0d, 0d, 0d}, new double[]{0d, 0d, 0d, 0d});
+
+        //Uncomment to check values without moving robot
+        //set(new double[]{0, 0, 0, 0}, new double[]{0, 0, 0, 0});
     }
 
     //Odometry - Reset origin with new origin at center of robot
@@ -353,9 +350,9 @@ public class SwerveMaster {
 
     //Odometry - Reset position of wheels with new center
     public void alignModules(double reducedAngle) {
-        leftUpModule.alignPosition(robotPosition, reducedAngle, new double[]{-0.3425d, 0.3425d});
-        leftDownModule.alignPosition(robotPosition, reducedAngle, new double[]{-0.3425d, -0.3425d});
-        rightUpModule.alignPosition(robotPosition, reducedAngle, new double[]{0.3425d, 0.3425d});
-        rightDownModule.alignPosition(robotPosition, reducedAngle, new double[]{0.3425d, -0.3425d});
+        leftUpModule.alignPosition(robotPosition, reducedAngle, Constants.leftUpStartPos);
+        leftDownModule.alignPosition(robotPosition, reducedAngle, Constants.leftDownStartPos);
+        rightUpModule.alignPosition(robotPosition, reducedAngle, Constants.rightUpStartPos);
+        rightDownModule.alignPosition(robotPosition, reducedAngle, Constants.rightDownStartPos);
     }
 }
