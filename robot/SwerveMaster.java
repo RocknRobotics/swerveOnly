@@ -10,6 +10,12 @@ import edu.wpi.first.wpilibj.I2C.Port;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.PS4Controller;
 
+//import edu.wpi.first.math.kinematics.ChassisSpeeds;
+//import edu.wpi.first.math.geometry.Pose2d;
+//import edu.wpi.first.math.geometry.Rotation2d;
+
+import edu.wpi.first.networktables.*;
+
 public class SwerveMaster {
     //Variables for each swerve module
     public SwerveModule leftUpModule;
@@ -26,6 +32,31 @@ public class SwerveMaster {
     //Odometry - robot's position
     private double[] robotPosition;
 
+    //Odometry - Time for velocity
+    private double prevTimePos;
+
+    //Odometry - Prev position for velocity
+    private double[] prevPosition;
+
+    //Odometry - Prev angle for omega
+    private double prevAngle;
+
+    //Odometry - Time for omega
+    private double prevTimeAng;
+
+    //PathPlanner - Network tables
+    /*private NetworkTableInstance jetsonClient;
+    private DoubleArrayPublisher chassisPublisher;
+    private DoubleArrayPublisher posePublisher;
+    private DoubleArraySubscriber poseSubscriber;
+    private BooleanSubscriber poseBooleanSubscriber;
+    private DoubleArraySubscriber ChassisSpeedsSubscriber;
+    private BooleanSubscriber ChassisSpeedsBooleanSubscriber;
+    */
+
+    //PathPlanner - True if path planner is controlling robot, cancels controller
+    boolean pathing = false;
+
     //Constructor
     public SwerveMaster() {
         //Create swerve module objects
@@ -39,10 +70,10 @@ public class SwerveMaster {
         turnConstants.rightDownInvert, turnConstants.rightDownEncoderInvert, turnConstants.rightDownOffset);
 
         //Set their position in relation to the center of the robot
-        leftUpModule.resetPosition(-0.3425d, 0.3425d);
-        leftDownModule.resetPosition(-0.3425d, -0.3425d);
-        rightUpModule.resetPosition(0.3425d, 0.3425d);
-        rightDownModule.resetPosition(0.3425d, -0.3425d);
+        leftUpModule.resetPosition(Constants.leftUpStartPos);
+        leftDownModule.resetPosition(Constants.leftDownStartPos);
+        rightUpModule.resetPosition(Constants.rightUpStartPos);
+        rightDownModule.resetPosition(Constants.rightDownStartPos);
 
         //Create accelerometer object
         accelerometer = new AHRS(Port.kMXP, Constants.accelerometerUpdateFrequency);
@@ -57,8 +88,32 @@ public class SwerveMaster {
         //Create robot position array as [x, y] starting as [0, 0]
         robotPosition = new double[2];
 
+        //Set previous position
+        prevPosition = new double[2];
+
+        //Set previous angle
+        prevAngle = getReducedAngle();
+
         //Drift constant to counteract drift
         SmartDashboard.putNumber("Drift Constant", -2d);
+
+        //Set times
+        prevTimePos = System.currentTimeMillis();
+        prevTimeAng = System.currentTimeMillis();
+
+        //Network Tables
+        /*jetsonClient = NetworkTableInstance.create();
+        jetsonClient.setServer("10.36.92.11");
+        jetsonClient.startClient4("roboRio");
+
+        //Publishers and subscribers
+        chassisPublisher = jetsonClient.getDoubleArrayTopic("/roborio/swervemaster/chassis").publish();
+        posePublisher = jetsonClient.getDoubleArrayTopic("/roborio/swervemaster/pose").publish();
+        poseSubscriber = jetsonClient.getDoubleArrayTopic("/roborio/swervemaster/resetPoseArray").subscribe(new double[]{0, 0, 0}, null);
+        poseBooleanSubscriber = jetsonClient.getBooleanTopic("/roborio/swervemaster/resetPoseBoolean").subscribe(false, null);
+        ChassisSpeedsSubscriber = jetsonClient.getDoubleArrayTopic("/roborio/swervemaster/setChassisSpeeds").subscribe(new double[]{0, 0, 0}, null);
+        ChassisSpeedsBooleanSubscriber = jetsonClient.getBooleanTopic("/roborio/swervemaster/setChassisSpeedsBoolean").subscribe(false, null);
+        */
     }
 
     //Method called every 20ms 
@@ -79,11 +134,35 @@ public class SwerveMaster {
         inputs[1] *= driveFactor;
         inputs[2] *= turnFactor; 
 
+        //Odometry - Update the position of the robot using the angle the robot is facing
+        // and the velocity of the wheels
+        updateRobotPosition(getReducedAngle());
+
+        //Odometry - Checking positions of wheels and center of robot
+        SmartDashboard.putNumber("Robot X", robotPosition[0]);
+        SmartDashboard.putNumber("Robot Y", robotPosition[1]);
+        SmartDashboard.putNumber("M0 X", leftUpModule.getModulePosition()[0]);
+        SmartDashboard.putNumber("M0 Y", leftUpModule.getModulePosition()[1]);
+        SmartDashboard.putNumber("M1 X", leftDownModule.getModulePosition()[0]);
+        SmartDashboard.putNumber("M1 Y", leftDownModule.getModulePosition()[1]);
+        SmartDashboard.putNumber("M2 X", rightUpModule.getModulePosition()[0]);
+        SmartDashboard.putNumber("M2 Y", rightUpModule.getModulePosition()[1]);
+        SmartDashboard.putNumber("M3 X", rightDownModule.getModulePosition()[0]);
+        SmartDashboard.putNumber("M3 Y", rightDownModule.getModulePosition()[1]);
+
         //Call the main method for teleop
-        teleopUpdate(inputs, 
-        new double[]{leftUpModule.getDriveVelocity(), leftDownModule.getDriveVelocity(), rightUpModule.getDriveVelocity(), rightDownModule.getDriveVelocity()}, 
-        new double[]{leftUpModule.getAbsoluteTurnPosition(), leftDownModule.getAbsoluteTurnPosition(), rightUpModule.getAbsoluteTurnPosition(), rightDownModule.getAbsoluteTurnPosition()}, 
-        this.getReducedAngle(), driveFactor, turnFactor);
+        if (!pathing) {
+            teleopUpdate(inputs, 
+            new double[]{leftUpModule.getAbsoluteTurnPosition(), leftDownModule.getAbsoluteTurnPosition(), rightUpModule.getAbsoluteTurnPosition(), rightDownModule.getAbsoluteTurnPosition()}, 
+            this.getReducedAngle(), driveFactor, turnFactor);
+        }
+
+        //Pathplanner - Send information to network table
+        /*sendPose2dtoNetwork();
+        sendChassisSpeedstoNetwork();
+        setPathPlannerSpeeds(driveFactor, turnFactor);
+        setPathplannerPose2d();*/
+        //jetsonClient.flush();
     }
 
     //Sets motor speeds given the drive and turn motor speeds
@@ -123,7 +202,7 @@ public class SwerveMaster {
     }
 
     //Main method for teleop driving
-    public void teleopUpdate(double[] inputs, double[] velocities, double[] positions, double reducedAngle, double driveFactor, double turnFactor) {
+    public void teleopUpdate(double[] inputs, double[] positions, double reducedAngle, double driveFactor, double turnFactor) {
         //If inputs are 0, do nothing and turn off the motors
         if(inputs[0] == 0 && inputs[1] == 0 && inputs[2] == 0) {
             set(new double[]{0d, 0d, 0d, 0d}, new double[]{0d, 0d, 0d, 0d});
@@ -266,8 +345,6 @@ public class SwerveMaster {
             //Invert wheel if optimized
             driveSets[i] = driveSetInvert * -desiredMagnitude[i];
             
-            
-    
             //Debugging purposes
             SmartDashboard.putNumber("Trans Ang " + i + ": ", translationalAngles[i]);
             SmartDashboard.putNumber("Trans Mag " + i + ": ", translationalMagnitude[i]);
@@ -281,22 +358,6 @@ public class SwerveMaster {
             SmartDashboard.putNumber("Drive Set " + i + ": ", driveSets[i]);
         }
 
-        //Odometry - Update the position of the robot using the angle the robot is facing
-        // and the velocity of the wheels
-        updateRobotPosition(reducedAngle);
-
-        //Odometry - Checking positions of wheels and center of robot
-        SmartDashboard.putNumber("Robot X", robotPosition[0]);
-        SmartDashboard.putNumber("Robot Y", robotPosition[1]);
-        SmartDashboard.putNumber("M0 X", leftUpModule.getModulePosition()[0]);
-        SmartDashboard.putNumber("M0 Y", leftUpModule.getModulePosition()[1]);
-        SmartDashboard.putNumber("M1 X", leftDownModule.getModulePosition()[0]);
-        SmartDashboard.putNumber("M1 Y", leftDownModule.getModulePosition()[1]);
-        SmartDashboard.putNumber("M2 X", rightUpModule.getModulePosition()[0]);
-        SmartDashboard.putNumber("M2 Y", rightUpModule.getModulePosition()[1]);
-        SmartDashboard.putNumber("M3 X", rightDownModule.getModulePosition()[0]);
-        SmartDashboard.putNumber("M3 Y", rightDownModule.getModulePosition()[1]);
-
         //Set the wheel speeds
         set(driveSets, turnSets);
 
@@ -309,16 +370,18 @@ public class SwerveMaster {
     public void resetOrigin() {
         resetRobotPosition(0, 0);
         resetAccelerometer();
-        leftUpModule.resetPosition(-0.3425d, 0.3425d);
-        leftDownModule.resetPosition(-0.3425d, -0.3425d);
-        rightUpModule.resetPosition(0.3425d, 0.3425d);
-        rightDownModule.resetPosition(0.3425d, -0.3425d);
+        leftUpModule.resetPosition(Constants.leftUpStartPos);
+        leftDownModule.resetPosition(Constants.leftDownStartPos);
+        rightUpModule.resetPosition(Constants.rightUpStartPos);
+        rightDownModule.resetPosition(Constants.rightDownStartPos);
     }
 
     //Odometry - Set robot position with x and y in meters from origin
     public void resetRobotPosition(double x, double y) {
         robotPosition[0] = x;
         robotPosition[1] = y;
+        prevPosition[0] = x;
+        prevPosition[1] = y;
         alignModules(getReducedAngle());
     }
 
@@ -355,4 +418,129 @@ public class SwerveMaster {
         rightUpModule.alignPosition(robotPosition, reducedAngle, Constants.rightUpStartPos);
         rightDownModule.alignPosition(robotPosition, reducedAngle, Constants.rightDownStartPos);
     }
+
+    //Odometry - Calculate and return the x and y velocity of robot as [xVel, yVel] in m/s
+    public double[] getVelocity() {
+        //Get current time
+        double currTime = System.currentTimeMillis();
+
+        //Calculate change in time in seconds
+        double deltaTime = ((currTime - prevTimePos) / 1000d);
+
+        //Create delta (change in position) and velocity x and y arrays
+        double[] delta = new double[2];
+        double[] velocity = new double[2];
+
+        //Calculate change in position
+        delta[0] = robotPosition[0] - prevPosition[0];
+        delta[1] = robotPosition[1] - prevPosition[1];
+
+        //Calculate velocity using delta position and delta time
+        velocity[0] = delta[0] / deltaTime;
+        velocity[1] = delta[1] / deltaTime; 
+
+        //Set new prev stuff
+        prevPosition[0] = robotPosition[0];
+        prevPosition[1] = robotPosition[1];
+        prevTimePos = currTime;
+
+        //Return velocity
+        return velocity;
+    }
+
+    //Odometry - Calculate and return omega (angular velocity) in radians per second
+    public double getOmega() {
+        //Get current time
+        double currTime = System.currentTimeMillis();
+
+        //Calculate change in time in seconds
+        double deltaTime = ((currTime - prevTimeAng) / 1000d);
+
+        //Get current angle
+        double currAngle = getReducedAngle();
+
+        //Convert current angle to radians
+        currAngle *= Math.PI / 180;
+
+        //Calculate change in angle (CCW Positive)
+        double deltaAngle = currAngle - prevAngle;
+
+        //Calculate omega
+        double omega = deltaAngle / deltaTime;
+
+        //Set new prev stuff
+        prevAngle = currAngle;
+        prevTimeAng = System.currentTimeMillis();
+
+        //return omega
+        return omega;
+    }
+
+    /* 
+    //PathPlanner - send Pose2d to network table
+    public void sendPose2dtoNetwork() {
+        //Get current angle
+        double angle = getReducedAngle();
+
+        //Convert angle to radians
+        angle *= Math.PI / 180;
+
+        //Send robotPose to network table
+        //Pose2d​(double x, double y, Rotation2d rotation)
+        //Rotation2d​(double value) value in radians
+        posePublisher.set(new double[]{robotPosition[0], robotPosition[1], angle});
+    }
+
+    //PathPlanner - send ChassisSpeeds to network table
+    public void sendChassisSpeedstoNetwork() {
+        //Get x and y velocities
+        double[] velocities = getVelocity();
+
+        //Get omega
+        double omega = getOmega();
+
+        //Send speeds to network table
+        //ChassisSpeeds​(double vxMetersPerSecond, double vyMetersPerSecond, double omegaRadiansPerSecond)
+        chassisPublisher.set(new double[]{velocities[0], velocities[1], omega});
+    }
+
+    //PathPlanner - Set new pose sent from network table if the pose boolean sent is true
+    public void setPathplannerPose2d() {
+        //Recieve boolean
+        boolean set = poseBooleanSubscriber.get();
+        if (set) {
+            //Recieve pose array as [x, y, radians]
+            double[] pose = poseSubscriber.get();
+
+            //Convert angle to degrees 
+            pose[2] *= 180 / Math.PI;
+            
+            //Set stuff (might not need angle?)
+            resetRobotPosition(pose[0], pose[1]);
+        }
+    }
+
+    //PathPlanner - Set new ROBOT RELATIVE Chassis Speeds from network table if speeds boolean is true
+    public void setPathPlannerSpeeds(double driveFactor, double turnFactor) {
+        //Recieve boolean
+        boolean set = ChassisSpeedsBooleanSubscriber.get();
+
+        //Cancel drive if setting speeds
+        pathing = set;
+        if (set) {
+            //Recieve pose array as [vx, vy, omega]
+            double[] speeds = ChassisSpeedsSubscriber.get();
+
+            //Convert angle to degrees per second
+            speeds[2] *= 180 / Math.PI;
+
+            //Convert to an input
+            speeds[2] /= 360;
+            
+            //Set stuff 
+            teleopUpdate(speeds, 
+            new double[]{leftUpModule.getAbsoluteTurnPosition(), leftDownModule.getAbsoluteTurnPosition(), rightUpModule.getAbsoluteTurnPosition(), rightDownModule.getAbsoluteTurnPosition()}, 
+            0, driveFactor, turnFactor);        
+        }
+    }*/
 }

@@ -16,14 +16,17 @@ public class SwerveModule {
     public CANSparkMax driveMotor;
     public CANSparkMax turnMotor;
 
+    //Relative encoder built into motor controller for odometry
     private RelativeEncoder driveRelative;
 
-    //The encoder for the turn motor
+    //The absolute encoder for the turn motor
     private AnalogEncoder turnEncoder;
     private double encoderOffset;
 
+    //Encoder invert
     private int encoderInvert;
 
+    //Odometry
     private double prevTime;
     private double[] currPos;
 
@@ -80,9 +83,9 @@ public class SwerveModule {
     }
 
     //Set x and y position of the motor in meters. 
-    public void resetPosition(double x, double y) {
-        currPos[0] = x;
-        currPos[1] = y;
+    public void resetPosition(double[] xy) {
+        currPos[0] = xy[0];
+        currPos[1] = xy[1];
     }
 
     //Get field position of the motor relative to the start origin
